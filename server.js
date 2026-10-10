@@ -379,7 +379,7 @@ function serveFile(res, file) {
     const ext = path.extname(file).toLowerCase();
     send(res, 200, data, {
       "Content-Type": MIME[ext] || "application/octet-stream",
-      "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=300"
+      "Cache-Control": "no-cache"
     });
   });
 }
