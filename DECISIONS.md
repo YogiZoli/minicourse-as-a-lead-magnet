@@ -24,3 +24,4 @@
 - 2026-10-10: The hosted AI answer is validated on the server. An incomplete outline counts as a failed model and the next model is tried. A model that worked is preferred for 15 minutes.
 - 2026-10-10: `Outline.normalize` skips anything that is not a real module or lesson and drops modules without lessons, so a sloppy AI answer cannot break a push.
 - 2026-10-10: Clearing the outline takes a second click. The browser warns before the tab is closed while work is running.
+- 2026-10-10: On Railway the model order is set by variables: `GEMINI_MODEL=gemini-3-flash-preview`, `GEMINI_FALLBACK_MODELS=gemini-flash-lite-latest,gemini-flash-latest`. Reason: `gemini-flash-latest` hung for 45 s on every call that evening. A model that hangs or fails rests for 10 minutes.
