@@ -1,6 +1,6 @@
 # STATUS
 
-Updated: 2026-10-10
+Updated: 2026-10-11
 
 ## End goal
 
@@ -16,7 +16,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
 | Detailed logging (structured server log, page events, session and ref codes, `scripts/logs.mjs`) | live. See README, "Logging" |
-| Reliability pass (time limits, live status, refs, activity log, crash notice, safe restart of saved work) | live. Every server error path probed with wrong keys and bad input. See README, "When something goes wrong" |
+| Reliability pass, two rounds (time limits, live status, refs, activity log, crash notice, safe restart of saved work, sign-in window that never false-fails, expired sign-ins, cut-off requests, clean shutdown) | live. Round two was driven by the live log. Checked with simulated sign-ins and wrong keys, see DECISIONS 2026-10-11 |
 | Brand design (Shine) on the main page, brand PDF with embedded Open Sans | live. Checked on phone width for the question, generation and result screens. Zoltan has not reviewed it yet |
 | One-click generation (server-side Gemini key) | works live. 14 s when the first model answers, about 65 s when it hangs and the next one takes over |
 | Own AI key mode | Gemini only, verified with `scripts/test-ai.mjs`. Claude, ChatGPT and Grok are listed but disabled ("coming soon"). The Claude and ChatGPT calls exist in `callAi()` but are untested, Grok is not written |
@@ -39,6 +39,6 @@ All five targets work. v2 is functionally complete.
 2. Zoltan: review the brand design and the PDF by eye, and one lesson body in GHL, Whop and MCG.
 3. Zoltan has more UI requests (one known: feedback after an action is too small). He wants them as a separate round.
 4. Open: Claude, ChatGPT and Grok in the own-key mode are listed as "coming soon".
-5. Open: test data left in his accounts, his call whether to delete: GHL vidrev (3 courses), Whop FreedompreneurAI (3 hidden courses), MCG (1 course), YouTube (1 unlisted playlist).
+5. Zoltan deletes the test data himself (asked 2026-10-11, the assistant does not delete data in his accounts): GHL vidrev 3 courses, Whop FreedompreneurAI 3 hidden courses, MCG 1 course, YouTube 1 unlisted playlist. Exact names and links were given in chat.
 
 GHL testing happens only in the vidrev sub-account. Never touch VoxFlow.
