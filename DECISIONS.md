@@ -13,3 +13,9 @@
 - 2026-10-10: MCG mapping: one MCG Course, one draft Module, our modules become its Sections, lessons are `info` lessons with a cards block (Teach, Do, Review). No landingPage and no image blocks are sent, so no AI credits are used.
 - 2026-10-10: Whop puts a placeholder chapter and lesson into every new course. They are filled with the first module and lesson (PATCH), not left empty.
 - 2026-10-10: Whop course link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the company route.
+- 2026-10-10: Zoltan asked for one-click generation paid by his own Gemini key. The key lives only in the Railway variable `GEMINI_API_KEY` and is used by `/api/ai/generate`. This departs from the original brief ("no keys on my server"). The route builds the prompt itself from the answers, so it can only write course outlines. Limits: 4 per visitor address per 10 minutes, `AI_DAILY_LIMIT` (default 200) per day.
+- 2026-10-10: Gemini model order: `GEMINI_MODEL` (default `gemini-flash-latest`), then `GEMINI_FALLBACK_MODELS` (default `gemini-3-flash-preview,gemini-flash-lite-latest`). `gemini-2.5-flash` is retired for new users.
+- 2026-10-10: Own AI key mode shows Gemini only. Claude, ChatGPT and Grok are listed as "coming soon".
+- 2026-10-10: Zoltan dropped the separate brand-design route. The brand design replaced the first look on the main page. Design source: `YogiZoli/design-system` `tokens.css` (v3 "Shine"), copied verbatim to `public/tokens.css`. App styles are in `public/app.css` and read role tokens only. Open Sans is embedded in the PDF from `public/fonts`.
+- 2026-10-10: Button roles: `.btn.big` is the one primary (fuchsia) action of a screen, plain `.btn` is the ink secondary, `.btn.ghost` is quiet.
+- 2026-10-10: Static files are served with `Cache-Control: no-cache`, so a reload always shows the current build.

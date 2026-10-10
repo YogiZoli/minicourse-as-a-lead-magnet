@@ -239,7 +239,7 @@
   $("hostedGo").addEventListener("click", function(){
     var btn = this;
     setErr($("hostedErr"), "");
-    btn.disabled = true; $("hostedStatus").textContent = "Writing your outline. This takes about half a minute.";
+    btn.disabled = true; $("hostedStatus").textContent = "Writing your outline. This takes about a minute.";
     api("/api/ai/generate", { answers:S.answers }).then(function(r){
       if(!r.ok) throw new Error(r.error);
       acceptOutline(r.text);
@@ -349,10 +349,11 @@
   $("dlPdf").addEventListener("click", function(){
     var msg = $("pdfMsg");
     if(!window.jspdf || !window.jspdf.jsPDF){ msg.textContent = "The PDF tool did not load. Check your connection, reload the page and try again."; return; }
-    try{
-      buildBlueprintPdf(S.outline, S.lead ? S.lead.name : "", PROGRAM_URL).save("my-course-blueprint.pdf");
+    msg.textContent = "Preparing your PDF.";
+    loadPdfFonts().then(function(fonts){
+      buildBlueprintPdf(S.outline, S.lead ? S.lead.name : "", PROGRAM_URL, fonts).save("my-course-blueprint.pdf");
       msg.textContent = "Check your downloads for the PDF.";
-    }catch(e){ msg.textContent = "The PDF could not be created. Reload the page and try again."; }
+    }).catch(function(){ msg.textContent = "The PDF could not be created. Reload the page and try again."; });
   });
   $("dlMd").addEventListener("click", function(){ download(fileBase() + "-blueprint.md", Outline.blueprintMd(S.outline), "text/markdown;charset=utf-8"); });
   $("dlJson").addEventListener("click", function(){ download(fileBase() + "-outline.json", JSON.stringify(S.outline, null, 2), "application/json"); });

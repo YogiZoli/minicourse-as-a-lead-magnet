@@ -4,7 +4,7 @@ Updated: 2026-10-10
 
 ## End goal
 
-A lead magnet that turns a creator's expertise into a complete course outline and pushes it into their course platform (Whop, GHL, MCG, Skool export, YouTube playlist). After v2 works: a brand-design duplicate on a separate route.
+A lead magnet that turns a creator's expertise into a complete course outline and pushes it into their course platform (Whop, GHL, MCG, Skool export, YouTube playlist), in the brand design.
 
 ## Where we are
 
@@ -15,6 +15,8 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Part | State |
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
+| Brand design (Shine) on the main page, brand PDF with embedded Open Sans | live. Checked on phone width for the question, generation and result screens. Zoltan has not reviewed it yet |
+| One-click generation (server-side Gemini key) | works, tested locally (75 s when the first model was overloaded) |
 | Own AI key mode | Gemini only, verified with `scripts/test-ai.mjs`. Claude, ChatGPT and Grok are listed but disabled ("coming soon"). The Claude and ChatGPT calls exist in `callAi()` but are untested, Grok is not written |
 | PDF, .md, outline .json | works. PDF layout not yet reviewed by eye |
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
@@ -30,7 +32,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 2. Zoltan: run the MCG push once on the live page (Connect, then Confirm and create) and report the result.
 4. Fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js`.
 5. Review the PDF and one GHL lesson body by eye.
-6. After all pushes work: 6-line summary, then the brand-design duplicate on a separate route.
+6. After the MCG push is confirmed: the 6-line summary from the brief.
 7. Zoltan has more UI requests. He wants them handled separately, after v2 is complete.
 
 GHL testing happens only in the vidrev sub-account. Never touch VoxFlow.
