@@ -23,16 +23,18 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
 | Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the right company route |
-| MCG push | sign-in works (tested live by Zoltan). Create is written: `course_create` then one `module_push` (our modules become sections), with a real `dryRun` in the preview. Not yet run against the account |
+| MCG push | works end to end, run live by Zoltan on 2026-10-10: dry run passed, course and draft module created, link opened. Lesson content inside the MCG editor not yet checked by eye |
 | Skool export | works |
 | YouTube playlist | works end to end, tested live by Zoltan on 2026-10-10 (unlisted playlist created) |
 
 ## Next step
 
-2. Zoltan: run the MCG push once on the live page (Connect, then Confirm and create) and report the result.
-4. Fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js`.
-5. Review the PDF and one GHL lesson body by eye.
-6. After the MCG push is confirmed: the 6-line summary from the brief.
-7. Zoltan has more UI requests. He wants them handled separately, after v2 is complete.
+All five targets work. v2 is functionally complete.
+
+1. Zoltan: fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js` (still empty or placeholder).
+2. Zoltan: review the brand design and the PDF by eye, and one lesson body in GHL, Whop and MCG.
+3. Zoltan has more UI requests (one known: feedback after an action is too small). He wants them as a separate round.
+4. Open: Claude, ChatGPT and Grok in the own-key mode are listed as "coming soon".
+5. Open: test data left in his accounts, his call whether to delete: GHL vidrev (1 course), Whop FreedompreneurAI (2 hidden courses), MCG (1 course), YouTube (1 unlisted playlist).
 
 GHL testing happens only in the vidrev sub-account. Never touch VoxFlow.
