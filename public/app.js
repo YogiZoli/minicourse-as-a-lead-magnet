@@ -537,9 +537,13 @@
         var key = $("whopKey").value.trim(), company = $("whopCompany").value.trim();
         function showPlan(list){
           if(!list.length) throw new Error("You are connected, but this whop has no Courses app yet. In Whop, add the Courses app to your whop, then try again.");
+          /* A whop can hold more than one Courses app. Only then is there something to choose. */
+          var options = list.map(function(e){ return '<option value="' + esc(e.id) + '">' + esc(e.label) + '</option>'; }).join("");
           ui.preview.innerHTML = planHtml("Whop", "It is saved as hidden, so students do not see it until you publish it.") +
-            '<label class="flabel" for="whopExp" style="margin:4px 0 0">Put it in</label><select id="whopExp">' +
-            list.map(function(e){ return '<option value="' + esc(e.id) + '">' + esc(e.label) + '</option>'; }).join("") + '</select>';
+            (list.length > 1
+              ? '<label class="flabel" for="whopExp" style="margin:4px 0 0">Your whop has ' + list.length + ' Courses apps. Pick the one the new course goes into.</label><select id="whopExp">' + options + '</select>'
+              : '<span>It goes into your Courses app: <strong>' + esc(list[0].label) + '</strong>.</span><select id="whopExp" hidden>' + options + '</select>');
+          logEvent("whop: " + list.length + " Courses app(s) found");
         }
         /* An API key typed into the fields wins. Otherwise the Connect sign-in is used. */
         if(key || !ENV.WHOP_CLIENT_ID){
