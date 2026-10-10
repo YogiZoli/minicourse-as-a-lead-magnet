@@ -11,7 +11,7 @@
  *
  * Add a number at the end to look further back, for example: node scripts/logs.mjs errors 5000
  */
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 
 const args = process.argv.slice(2);
 const full = args[0] === "full" ? (args.shift(), true) : false;
@@ -21,7 +21,8 @@ const value = (args[1] || "").toLowerCase();
 
 let raw;
 try {
-  raw = execFileSync("railway", ["logs", "-s", "minicourse-as-a-lead-magnet", "--json", "-n", wanted], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, shell: process.platform === "win32" });
+  /* "wanted" is digits only (checked above), so this command line is fixed text plus a number. */
+  raw = execSync("railway logs -s minicourse-as-a-lead-magnet --json -n " + wanted, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
 } catch (e) {
   console.log("Could not read the Railway log. Is the Railway CLI installed and signed in? " + (e.stderr || e.message));
   process.exit(1);
@@ -42,6 +43,8 @@ function read(line) {
 
 const rows = raw.split(/\r?\n/).map(read).filter(Boolean).filter((d) => {
   const text = JSON.stringify(d).toLowerCase();
+  /* Railway's own start-up notice from npm, not ours and not a problem. */
+  if (!d.event && /npm warn config production/i.test(String(d.message))) return false;
   if (mode === "errors") return d.level === "error" || d.level === "warn";
   if (mode === "ref") return String(d.ref || "").toLowerCase() === value || text.includes("ref " + value);
   if (mode === "session") return String(d.sid || "").toLowerCase() === value;
