@@ -15,21 +15,19 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Part | State |
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
-| Own AI key mode (Anthropic, OpenAI, Gemini) | built, not tested (no key yet) |
+| Own AI key mode (Anthropic, OpenAI, Gemini) | Gemini verified with `scripts/test-ai.mjs` (same request as the browser, valid outline in 26 s). Anthropic and OpenAI not tested, no keys |
 | PDF, .md, outline .json | works. PDF layout not yet reviewed by eye |
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
-| Whop push | built, not tested (waiting for API key and company ID) |
+| Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link format is a guess, not yet confirmed by eye |
 | MCG push | sign-in and tool listing built, course creation not built (tool list needed from a signed-in account) |
 | Skool export | works |
 | YouTube playlist | works end to end, tested live by Zoltan on 2026-10-10 (unlisted playlist created) |
 
 ## Next step
 
-1. Zoltan: Whop API key into `.env.test`, company ID in chat. Then run `node scripts/test-push.mjs whop`.
 2. Zoltan: click Connect Mini Course Generator on the result screen, copy the connection details, send them. Then write `mcgCreate()` in `public/app.js`.
-3. Zoltan: an AI key (Anthropic, OpenAI or Gemini) to test the own-key mode, or decide to ship it untested.
 4. Fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js`.
 5. Review the PDF and one GHL lesson body by eye.
 6. After all pushes work: 6-line summary, then the brand-design duplicate on a separate route.
