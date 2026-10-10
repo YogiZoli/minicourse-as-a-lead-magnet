@@ -25,3 +25,6 @@
 - 2026-10-10: `Outline.normalize` skips anything that is not a real module or lesson and drops modules without lessons, so a sloppy AI answer cannot break a push.
 - 2026-10-10: Clearing the outline takes a second click. The browser warns before the tab is closed while work is running.
 - 2026-10-10: On Railway the model order is set by variables: `GEMINI_MODEL=gemini-3-flash-preview`, `GEMINI_FALLBACK_MODELS=gemini-flash-lite-latest,gemini-flash-latest`. Reason: `gemini-flash-latest` hung for 45 s on every call that evening. A model that hangs or fails rests for 10 minutes.
+- 2026-10-10: Connect buttons for Whop and GHL (OAuth), so visitors copy no keys. Whop: OAuth 2.1 with PKCE as a public client, no secret. GHL: Marketplace app, the secret stays in a Railway variable and is used only for the token exchange. The key and token fields stay as a fallback and win if filled in.
+- 2026-10-10: One shared sign-in window helper for Whop, GHL and MCG. The answer comes back by window message and by a short-lived localStorage note, because some sign-in pages cut the link between the two windows. A "Stop waiting" button ends the wait.
+- 2026-10-10: Zoltan does not want a "Create everywhere" button. Each visitor has one favourite platform, the separate panels stay.

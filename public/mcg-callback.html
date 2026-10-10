@@ -4,21 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Connecting</title>
-<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:32px 16px;text-align:center;color:#121A16;background:#fff}</style>
+<style>body{font-family:"Open Sans","Segoe UI",system-ui,sans-serif;margin:0;padding:32px 16px;text-align:center;color:#0E1330;background:#F7F8FB}</style>
 </head>
 <body>
-<p id="msg">Connecting. This window closes by itself.</p>
+<p id="msg">Connected. This window closes by itself.</p>
 <script>
-/* Hands the sign-in result back to the page that opened this window, then closes. */
+/*
+ * Hands the sign-in result back to the course page, then closes.
+ * Two ways, because some sign-in pages cut the link between this window and the page that opened it:
+ * a direct message to the opener, and a short-lived note in localStorage that the course page is listening for.
+ * The code is single-use and useless without the secret half that stays in the course page or on the server.
+ */
 (function(){
   var q = new URLSearchParams(location.search);
-  var data = { type:"mcg-oauth", code:q.get("code") || "", state:q.get("state") || "", error:q.get("error_description") || q.get("error") || "" };
-  if(window.opener){
-    window.opener.postMessage(data, location.origin);
-    window.close();
-  } else {
-    document.getElementById("msg").textContent = "You can close this window and go back to the course page.";
-  }
+  var data = { type:"oauth-cb", code:q.get("code") || "", state:q.get("state") || "", error:q.get("error_description") || q.get("error") || "", at:Date.now() };
+  try{ if(window.opener) window.opener.postMessage(data, location.origin); }catch(e){}
+  try{ localStorage.setItem("mc_oauth_cb", JSON.stringify(data)); }catch(e){}
+  setTimeout(function(){
+    try{ window.close(); }catch(e){}
+    document.getElementById("msg").textContent = "Connected. You can close this window and go back to the course page.";
+  }, 400);
 })();
 </script>
 </body>

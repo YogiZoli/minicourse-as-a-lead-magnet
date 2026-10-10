@@ -454,27 +454,58 @@
   }
 
   var mcg = { token:"", tools:null };
+  /* Platform sign-ins from the Connect buttons. Kept in memory only: gone when the tab is reloaded or closed. */
+  var conn = { whop:{ token:"" }, ghl:{ token:"", locationId:"" } };
 
   var PUSH = {
     whop: {
       previewLabel:"Check my key and preview",
       previewWait:"Checking your key with Whop. A few seconds.",
+      signIn:true,
+      setup:function(){
+        var on = !!ENV.WHOP_CLIENT_ID;
+        $("whopAlt").open = !on;
+        this.previewLabel = on ? "Connect Whop" : "Check my key and preview";
+        this.previewWait = on ? "Waiting for you to sign in to Whop in the small window. After that we look up your whop. Nothing is created yet." : "Checking your key with Whop. A few seconds.";
+        if(on) $("whopHint").textContent = "Sign in to Whop in a small window, no key to copy. It creates the course, its chapters and lessons as a hidden draft. You need the Courses app added to your whop.";
+      },
       confirmWait:"Creating the course, its chapters and lessons in Whop, one by one. This takes up to a minute. Keep this tab open until you see the result.",
       preview:function(ui){
         var key = $("whopKey").value.trim(), company = $("whopCompany").value.trim();
-        if(!key) return Promise.reject(new Error("Paste your Whop API key."));
-        if(!/^biz_/.test(company)) return Promise.reject(new Error("Enter your company ID. It starts with biz_ and is in your Whop dashboard address."));
-        return api("/api/whop/check", { apiKey:key, companyId:company }).then(function(r){
-          if(!r.ok) throw new Error(r.error);
-          var list = r.experiences.filter(function(e){ return e.isCourses; });
-          if(!list.length) throw new Error("Your key works, but this whop has no Courses app yet. In Whop, add the Courses app to your whop, then try again.");
+        function showPlan(list){
+          if(!list.length) throw new Error("You are connected, but this whop has no Courses app yet. In Whop, add the Courses app to your whop, then try again.");
           ui.preview.innerHTML = planHtml("Whop", "It is saved as hidden, so students do not see it until you publish it.") +
             '<label class="flabel" for="whopExp" style="margin:4px 0 0">Put it in</label><select id="whopExp">' +
-            list.map(function(e){ return '<option value="' + esc(e.id) + '">' + esc(e.name || e.id) + '</option>'; }).join("") + '</select>';
-        });
+            list.map(function(e){ return '<option value="' + esc(e.id) + '">' + esc(e.label) + '</option>'; }).join("") + '</select>';
+        }
+        /* An API key typed into the fields wins. Otherwise the Connect sign-in is used. */
+        if(key || !ENV.WHOP_CLIENT_ID){
+          if(!key) return Promise.reject(new Error("Paste your Whop API key."));
+          if(!/^biz_/.test(company)) return Promise.reject(new Error("Enter your company ID. It starts with biz_ and is in your Whop dashboard address."));
+          conn.whop.use = key;
+          return api("/api/whop/check", { apiKey:key, companyId:company }).then(function(r){
+            if(!r.ok) throw new Error(r.error);
+            showPlan(r.experiences.filter(function(e){ return e.isCourses; }).map(function(e){ return { id:e.id, label:e.name || e.id }; }));
+          });
+        }
+        var popup = conn.whop.token ? null : window.open("about:blank", "connect_whop", "width=520,height=760");
+        return (conn.whop.token ? Promise.resolve() : whopConnect(popup)).then(function(){
+          conn.whop.use = conn.whop.token;
+          return api("/api/whop/companies", { apiKey:conn.whop.token });
+        }).then(function(r){
+          if(!r.ok){ if(/did not accept|expired/.test(r.error)) conn.whop.token = ""; throw new Error(r.error); }
+          if(!r.companies.length) throw new Error("You are signed in, but we could not see a whop you manage. Open \"Use an API key instead\" below and connect that way.");
+          return Promise.all(r.companies.slice(0, 6).map(function(c){
+            return api("/api/whop/check", { apiKey:conn.whop.token, companyId:c.id }).then(function(x){
+              return (x.ok ? x.experiences : []).filter(function(e){ return e.isCourses; }).map(function(e){
+                return { id:e.id, label:(r.companies.length > 1 ? c.title + ": " : "") + (e.name || e.id) };
+              });
+            });
+          }));
+        }).then(function(lists){ showPlan([].concat.apply([], lists)); });
       },
       confirm:function(){
-        return api("/api/whop/push", { apiKey:$("whopKey").value.trim(), experienceId:$("whopExp").value, course:Outline.pushCourse(S.outline) }, 200000).then(function(r){
+        return api("/api/whop/push", { apiKey:conn.whop.use, experienceId:$("whopExp").value, course:Outline.pushCourse(S.outline) }, 200000).then(function(r){
           if(!r.ok && r.created && r.created.courseId) r.error += " Whop already has part of it: 1 course, " + r.created.chapters + " chapters and " + r.created.lessons + " lessons. Delete that course in Whop before you try again, or you will get a second one.";
           return r;
         });
@@ -483,16 +514,37 @@
     },
     ghl: {
       previewLabel:"Preview",
+      signIn:true,
+      setup:function(){
+        var on = !!ENV.GHL_CLIENT_ID;
+        $("ghlAlt").open = !on;
+        this.previewLabel = on ? "Connect GoHighLevel" : "Preview";
+        this.previewWait = on ? "Waiting for you to sign in to GoHighLevel and pick a sub-account in the small window. Nothing is created yet." : "Checking.";
+        if(on) $("ghlHint").textContent = "Sign in to GoHighLevel in a small window and pick the sub-account, no token to copy. Modules become categories, lessons become draft posts.";
+      },
       confirmWait:"Sending the course to GoHighLevel. A few seconds. Keep this tab open until you see the result.",
       preview:function(ui){
         var loc = $("ghlLocation").value.trim(), tok = $("ghlToken").value.trim();
-        if(!loc) return Promise.reject(new Error("Enter your Location ID."));
-        if(!tok) return Promise.reject(new Error("Paste your Private Integration Token."));
-        ui.preview.innerHTML = planHtml("GoHighLevel, location " + loc, "Modules become categories and lessons become draft posts. GoHighLevel imports in the background, so lessons can take a minute to appear.");
-        return Promise.resolve();
+        var note = "Modules become categories and lessons become draft posts. GoHighLevel imports in the background, so lessons can take a minute to appear.";
+        /* A token typed into the fields wins. Otherwise the Connect sign-in is used. */
+        if(tok || loc || !ENV.GHL_CLIENT_ID){
+          if(!loc) return Promise.reject(new Error("Enter your Location ID."));
+          if(!tok) return Promise.reject(new Error("Paste your Private Integration Token."));
+          conn.ghl.use = { token:tok, locationId:loc };
+          ui.preview.innerHTML = planHtml("GoHighLevel, location " + loc, note);
+          return Promise.resolve();
+        }
+        var popup = conn.ghl.token ? null : window.open("about:blank", "connect_crm", "width=560,height=780");
+        return (conn.ghl.token ? Promise.resolve() : ghlConnect(popup)).then(function(){
+          conn.ghl.use = { token:conn.ghl.token, locationId:conn.ghl.locationId };
+          ui.preview.innerHTML = planHtml("the GoHighLevel sub-account you picked", note);
+        });
       },
       confirm:function(){
-        return api("/api/ghl/push", { token:$("ghlToken").value.trim(), locationId:$("ghlLocation").value.trim(), course:Outline.pushCourse(S.outline) });
+        return api("/api/ghl/push", { token:conn.ghl.use.token, locationId:conn.ghl.use.locationId, course:Outline.pushCourse(S.outline) }).then(function(r){
+          if(!r.ok && /did not accept/.test(r.error)) conn.ghl.token = "";
+          return r;
+        });
       },
       done:function(){
         if(SNAPSHOT_URL){ $("snapshotLink").href = SNAPSHOT_URL; $("snapshotPanel").hidden = false; }
@@ -501,6 +553,7 @@
     },
     mcg: {
       previewLabel:"Connect Mini Course Generator",
+      signIn:true,
       previewWait:"Waiting for you to sign in in the small window. After that, Mini Course Generator checks the course. Nothing is created yet.",
       confirmWait:"Creating the course and its lessons in Mini Course Generator. This takes up to a minute. Keep this tab open until you see the result.",
       /* The sign-in window has to open inside the click, before any waiting, or the browser blocks it. */
@@ -546,22 +599,26 @@
 
   function setupPush(host){
     var name = host.dataset.platform, def = PUSH[name];
+    if(def.setup) def.setup();
     host.innerHTML =
       '<p class="formerr" role="alert" hidden></p>' +
       '<div class="actions" data-r="start"><button class="btn" type="button" data-a="preview">' + esc(def.previewLabel) + '</button></div>' +
       '<div class="preview" hidden></div>' +
       '<div class="actions" data-r="confirm" hidden><button class="btn big" type="button" data-a="confirm">Confirm and create</button><button class="btn ghost" type="button" data-a="cancel">Cancel</button></div>' +
       '<p class="status" role="status" hidden></p>' +
+      '<div class="actions" data-r="stop" hidden><button class="btn ghost" type="button" data-a="stop">Stop waiting</button></div>' +
       '<p class="okmsg" role="status" hidden></p>';
     var ui = {
       err:host.querySelector(".formerr"), preview:host.querySelector(".preview"), ok:host.querySelector(".okmsg"), status:host.querySelector(".status"),
-      start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]')
+      start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]'), stop:host.querySelector('[data-r="stop"]')
     };
     var busyNow = false;
     function reset(){ ui.preview.hidden = true; ui.confirm.hidden = true; ui.start.hidden = false; }
     function lock(on){
       busyNow = on;
-      Array.prototype.forEach.call(host.querySelectorAll("button"), function(b){ b.disabled = on; });
+      Array.prototype.forEach.call(host.querySelectorAll("button"), function(b){ if(b.dataset.a !== "stop") b.disabled = on; });
+      /* While a sign-in window is open the visitor can stop the wait. */
+      ui.stop.hidden = !(on && def.signIn);
     }
     function fail(e){
       setErr(ui.err, (e && e.message) || "Something went wrong. Try again.");
@@ -571,7 +628,9 @@
     function run(step){ return Promise.resolve().then(step); }
 
     host.onclick = function(ev){
-      var b = ev.target.closest("button[data-a]"); if(!b || busyNow) return;
+      var b = ev.target.closest("button[data-a]"); if(!b) return;
+      if(b.dataset.a === "stop"){ if(stopWaiting) stopWaiting(); return; }
+      if(busyNow) return;
       var a = b.dataset.a, stop;
       if(a === "cancel"){ reset(); return; }
       setErr(ui.err, ""); ui.ok.hidden = true;
@@ -607,40 +666,120 @@
     var s = ""; bytes.forEach(function(x){ s += String.fromCharCode(x); });
     return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
+  function pkce(){
+    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)).then(function(hash){
+      return { verifier:verifier, challenge:b64url(new Uint8Array(hash)) };
+    });
+  }
+  function newState(){ return b64url(crypto.getRandomValues(new Uint8Array(12))); }
+
+  /*
+   * Sends the sign-in window to a platform and waits for the answer.
+   * The answer comes back two ways (a message from the window, and a note in localStorage), because some
+   * sign-in pages cut the link between the two windows. For the same reason a window that looks closed in
+   * the first seconds is not trusted as closed. The visitor can always stop the wait with "Stop waiting".
+   */
+  var stopWaiting = null;
+  function signInWindow(popup, url, state, who, lenientState){
+    if(!popup) return Promise.reject(new Error("Your browser blocked the sign-in window. Allow pop-ups for this page and try again."));
+    try{ localStorage.removeItem("mc_oauth_cb"); }catch(e){}
+    var t0 = Date.now();
+    popup.location.href = url;
+    return new Promise(function(resolve, reject){
+      var closedAt = 0, finished = false;
+      var timer = setInterval(function(){
+        readStored();
+        if(finished) return;
+        if(Date.now() - t0 > 600000) return end(new Error("The " + who + " sign-in was not finished within 10 minutes. Try again."));
+        var closed = false; try{ closed = popup.closed; }catch(e){ closed = false; }
+        if(!closed){ closedAt = 0; return; }
+        if(Date.now() - t0 < 4000) return;              /* too early to be the visitor: the link was cut, keep waiting */
+        if(!closedAt){ closedAt = Date.now(); return; }
+        if(Date.now() - closedAt > 2500) end(new Error("The " + who + " sign-in window was closed before it finished. Try again."));
+      }, 500);
+      function end(err, code){
+        if(finished) return; finished = true;
+        clearInterval(timer); window.removeEventListener("message", onMsg); window.removeEventListener("storage", readStored);
+        stopWaiting = null;
+        try{ localStorage.removeItem("mc_oauth_cb"); }catch(e){}
+        try{ popup.close(); }catch(e){}
+        if(err) reject(err); else resolve(code);
+      }
+      function take(d){
+        if(!d || d.type !== "oauth-cb") return;
+        if(d.state !== state && !(lenientState && !d.state)) return;   /* an answer for some other sign-in */
+        if(d.error) end(new Error(who + " did not connect: " + String(d.error).slice(0, 200)));
+        else if(!d.code) end(new Error(who + " sent back an empty answer. Try again."));
+        else end(null, d.code);
+      }
+      function onMsg(ev){ if(ev.origin === location.origin) take(ev.data); }
+      function readStored(){
+        var raw = null; try{ raw = localStorage.getItem("mc_oauth_cb"); }catch(e){}
+        if(!raw) return;
+        try{ var d = JSON.parse(raw); if(d && d.at >= t0) take(d); }catch(e){}
+      }
+      window.addEventListener("message", onMsg);
+      window.addEventListener("storage", readStored);
+      stopWaiting = function(){ end(new Error("Stopped. Nothing was connected.")); };
+    });
+  }
+
+  function whopConnect(popup){
+    var redirectUri = location.origin + "/connect/whop/callback", state = newState(), keys;
+    return pkce().then(function(k){
+      keys = k;
+      var q = new URLSearchParams({
+        response_type:"code", client_id:ENV.WHOP_CLIENT_ID, redirect_uri:redirectUri,
+        scope:"openid courses:read courses:update company:basic:read",
+        state:state, nonce:newState(), code_challenge:k.challenge, code_challenge_method:"S256"
+      });
+      return signInWindow(popup, "https://api.whop.com/oauth/authorize?" + q.toString(), state, "Whop");
+    }).then(function(code){
+      return api("/api/whop/oauth/token", { code:code, redirectUri:redirectUri, codeVerifier:keys.verifier });
+    }).then(function(r){
+      if(!r.ok) throw new Error(r.error);
+      conn.whop.token = r.accessToken;
+      logEvent("whop: connected");
+    }, function(e){ try{ if(popup) popup.close(); }catch(x){} throw e; });
+  }
+
+  function ghlConnect(popup){
+    var redirectUri = location.origin + "/connect/crm/callback", state = newState();
+    var q = new URLSearchParams({
+      response_type:"code", redirect_uri:redirectUri, client_id:ENV.GHL_CLIENT_ID, scope:"courses.write",
+      version_id:String(ENV.GHL_CLIENT_ID).split("-")[0], state:state
+    });
+    return signInWindow(popup, "https://marketplace.gohighlevel.com/oauth/chooselocation?" + q.toString(), state, "GoHighLevel", true).then(function(code){
+      return api("/api/ghl/oauth/token", { code:code, redirectUri:redirectUri });
+    }).then(function(r){
+      if(!r.ok) throw new Error(r.error);
+      conn.ghl.token = r.accessToken; conn.ghl.locationId = r.locationId;
+      logEvent("ghl: connected to sub-account " + r.locationId);
+    }, function(e){ try{ if(popup) popup.close(); }catch(x){} throw e; });
+  }
+
   function mcgConnect(popup){
     if(!popup) return Promise.reject(new Error("Your browser blocked the sign-in window. Allow pop-ups for this page and try again."));
-    var redirectUri = location.origin + "/mcg-callback";
-    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    var state = b64url(crypto.getRandomValues(new Uint8Array(12)));
-    var client;
+    var redirectUri = location.origin + "/mcg-callback", state = newState(), client, keys;
     return api("/api/mcg/register", { redirectUri:redirectUri }).then(function(r){
       if(!r.ok) throw new Error(r.error);
       client = r;
-      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-    }).then(function(hash){
+      return pkce();
+    }).then(function(k){
+      keys = k;
       var q = new URLSearchParams({
         response_type:"code", client_id:client.clientId, redirect_uri:redirectUri, scope:"mcp",
-        state:state, code_challenge:b64url(new Uint8Array(hash)), code_challenge_method:"S256",
+        state:state, code_challenge:k.challenge, code_challenge_method:"S256",
         resource:"https://mcp.minicoursegenerator.com/"
       });
-      popup.location.href = client.authorizeUrl + "?" + q.toString();
-      return new Promise(function(resolve, reject){
-        var timer = setInterval(function(){ if(popup.closed){ cleanup(); reject(new Error("The sign-in window was closed before it finished. Try again.")); } }, 700);
-        function cleanup(){ clearInterval(timer); window.removeEventListener("message", onMsg); }
-        function onMsg(ev){
-          if(ev.origin !== location.origin || !ev.data || ev.data.type !== "mcg-oauth") return;
-          cleanup();
-          if(ev.data.error) reject(new Error("Mini Course Generator did not connect: " + ev.data.error));
-          else if(ev.data.state !== state) reject(new Error("The sign-in answer did not match. Try again."));
-          else resolve(ev.data.code);
-        }
-        window.addEventListener("message", onMsg);
-      });
+      return signInWindow(popup, client.authorizeUrl + "?" + q.toString(), state, "Mini Course Generator");
     }).then(function(code){
-      return api("/api/mcg/token", { code:code, redirectUri:redirectUri, clientId:client.clientId, clientSecret:client.clientSecret, codeVerifier:verifier });
+      return api("/api/mcg/token", { code:code, redirectUri:redirectUri, clientId:client.clientId, clientSecret:client.clientSecret, codeVerifier:keys.verifier });
     }).then(function(r){
       if(!r.ok) throw new Error(r.error);
       mcg.token = r.accessToken;
+      logEvent("mcg: connected");
     }, function(e){ try{ popup.close(); }catch(x){} throw e; });
   }
 

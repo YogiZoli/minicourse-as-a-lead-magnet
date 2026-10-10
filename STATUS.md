@@ -23,6 +23,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
+| Connect Whop and Connect GoHighLevel (OAuth, no keys to copy) | code live, switched off until the app ids are set. Tested locally with a simulated sign-in window. Not yet run against real Whop or GHL sign-in |
 | Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the right company route |
 | MCG push | works end to end, run live by Zoltan on 2026-10-10: dry run passed, course and draft module created, link opened. Lesson content inside the MCG editor not yet checked by eye |
 | Skool export | works |
@@ -32,6 +33,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 
 All five targets work. v2 is functionally complete.
 
+0. Zoltan: create the Whop app and the HighLevel Marketplace app (steps were given in chat on 2026-10-10), send the Whop app id and the GHL client id, put the GHL client secret into `.env.test` as `GHL_CLIENT_SECRET=`. Then set the three Railway variables and test both Connect buttons live. Open question for the first live test: does Whop list the visitor's companies with `company:basic:read`.
 1. Zoltan: fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js` (still empty or placeholder).
 2. Zoltan: review the brand design and the PDF by eye, and one lesson body in GHL, Whop and MCG.
 3. Zoltan has more UI requests (one known: feedback after an action is too small). He wants them as a separate round.

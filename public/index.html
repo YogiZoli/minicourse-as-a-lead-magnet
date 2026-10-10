@@ -210,12 +210,18 @@
     <details id="pWhop">
       <summary>Whop <span class="tag">Direct push</span><span class="chev">+</span></summary>
       <div class="body">
-        <p class="hint">Creates the course, its chapters and lessons as a hidden draft. You need a company API key with the courses permissions, and the Courses app added to your whop.</p>
-        <div class="fields">
-          <div class="field"><label class="flabel" for="whopKey">Whop API key</label><input id="whopKey" type="password" autocomplete="off" spellcheck="false"></div>
-          <div class="field"><label class="flabel" for="whopCompany">Company ID</label><input id="whopCompany" type="text" placeholder="biz_..." autocomplete="off" spellcheck="false"></div>
-        </div>
-        <p class="hint">The company ID is in your dashboard address: whop.com/dashboard/biz_...</p>
+        <p class="hint" id="whopHint">Creates the course, its chapters and lessons as a hidden draft. You need the Courses app added to your whop.</p>
+        <details class="alt" id="whopAlt">
+          <summary>Use an API key instead <span class="chev">+</span></summary>
+          <div class="body">
+            <p class="hint">A company API key with the courses permissions. If you fill these in, they are used instead of Connect.</p>
+            <div class="fields">
+              <div class="field"><label class="flabel" for="whopKey">Whop API key</label><input id="whopKey" type="password" autocomplete="off" spellcheck="false"></div>
+              <div class="field"><label class="flabel" for="whopCompany">Company ID</label><input id="whopCompany" type="text" placeholder="biz_..." autocomplete="off" spellcheck="false"></div>
+            </div>
+            <p class="hint">The company ID is in your dashboard address: whop.com/dashboard/biz_...</p>
+          </div>
+        </details>
         <div class="push" data-platform="whop"></div>
       </div>
     </details>
@@ -223,11 +229,17 @@
     <details id="pGhl">
       <summary>GoHighLevel <span class="tag">Direct push</span><span class="chev">+</span></summary>
       <div class="body">
-        <p class="hint">Imports the course into Memberships. Modules become categories, lessons become draft posts. You need a Private Integration Token from Settings, Private Integrations.</p>
-        <div class="fields">
-          <div class="field"><label class="flabel" for="ghlLocation">Location ID</label><input id="ghlLocation" type="text" autocomplete="off" spellcheck="false"></div>
-          <div class="field"><label class="flabel" for="ghlToken">Private Integration Token</label><input id="ghlToken" type="password" placeholder="pit-..." autocomplete="off" spellcheck="false"></div>
-        </div>
+        <p class="hint" id="ghlHint">Imports the course into Memberships. Modules become categories, lessons become draft posts.</p>
+        <details class="alt" id="ghlAlt">
+          <summary>Use a Private Integration Token instead <span class="chev">+</span></summary>
+          <div class="body">
+            <p class="hint">From Settings, Private Integrations, with the courses scope. If you fill these in, they are used instead of Connect.</p>
+            <div class="fields">
+              <div class="field"><label class="flabel" for="ghlLocation">Location ID</label><input id="ghlLocation" type="text" autocomplete="off" spellcheck="false"></div>
+              <div class="field"><label class="flabel" for="ghlToken">Private Integration Token</label><input id="ghlToken" type="password" placeholder="pit-..." autocomplete="off" spellcheck="false"></div>
+            </div>
+          </div>
+        </details>
         <div class="push" data-platform="ghl"></div>
       </div>
     </details>

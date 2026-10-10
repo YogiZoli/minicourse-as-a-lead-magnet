@@ -26,6 +26,10 @@ process.on("unhandledRejection", (e) => { console.log("unhandledRejection " + (e
 
 const PORT = process.env.PORT || 3000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+/* "Connect" buttons. The ids are public. Only the GHL secret is private, and it never leaves this server. */
+const WHOP_CLIENT_ID = process.env.WHOP_CLIENT_ID || "";
+const GHL_CLIENT_ID = process.env.GHL_CLIENT_ID || "";
+const GHL_CLIENT_SECRET = process.env.GHL_CLIENT_SECRET || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const SCHEMA_DIR = path.join(__dirname, "schema");
 const MAX_BODY = 600 * 1024;
@@ -202,6 +206,37 @@ async function whopCheck(body) {
   return { ok: true, experiences };
 }
 
+/* Connect Whop: swaps the sign-in code for a token. Whop uses PKCE, so there is no secret. The token goes back to the visitor's tab and is not kept here. */
+async function whopOauthToken(body) {
+  if (!WHOP_CLIENT_ID) throw new HttpError(503, "Connect Whop is not switched on. Use an API key instead.");
+  const r = await call("https://api.whop.com/oauth/token", {
+    method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({
+      grant_type: "authorization_code", code: need(body.code, "sign-in code"),
+      redirect_uri: need(body.redirectUri, "redirect URI"), client_id: WHOP_CLIENT_ID,
+      code_verifier: need(body.codeVerifier, "code verifier")
+    })
+  });
+  if (!r.ok || !r.json || !r.json.access_token) throw new HttpError(502, "Whop did not finish the sign-in. Try Connect Whop again." + (detail(r) ? " Whop said: " + detail(r) : ""));
+  return { ok: true, accessToken: r.json.access_token };
+}
+
+/* Which whops can this sign-in work on. */
+async function whopCompanies(body) {
+  const key = need(body.apiKey, "Whop sign-in");
+  const r = await call(WHOP + "/companies?first=50", { headers: whopHeaders(key) });
+  let list = r.ok && r.json && Array.isArray(r.json.data) ? r.json.data : [];
+  if (!list.length) {
+    /* Fallback: a sign-in tied to one whop names it in the profile. */
+    const u = await call("https://api.whop.com/oauth/userinfo", { headers: whopHeaders(key) });
+    const c = u.ok && u.json ? u.json.company : null;
+    if (c && typeof c === "object" && c.id) list = [c];
+    else if (typeof c === "string") list = [{ id: c, title: c }];
+  }
+  if (!list.length && !r.ok) throw new HttpError(502, plain("Whop", r));
+  return { ok: true, companies: list.map((c) => ({ id: c.id, title: c.title || c.name || c.id })) };
+}
+
 async function whopPush(body) {
   const key = need(body.apiKey, "Whop API key");
   const experienceId = need(body.experienceId, "Whop experience");
@@ -276,6 +311,21 @@ async function ghlPush(body) {
     courseId: first ? first.id : "",
     link: (first && first.url) || "https://app.gohighlevel.com/v2/location/" + encodeURIComponent(locationId) + "/memberships/courses/products"
   };
+}
+
+/* Connect GoHighLevel: swaps the sign-in code for a sub-account token. The app secret is added here and never sent to the browser. */
+async function ghlOauthToken(body) {
+  if (!GHL_CLIENT_ID || !GHL_CLIENT_SECRET) throw new HttpError(503, "Connect GoHighLevel is not switched on. Use a Private Integration Token instead.");
+  const form = new URLSearchParams({
+    client_id: GHL_CLIENT_ID, client_secret: GHL_CLIENT_SECRET, grant_type: "authorization_code",
+    code: need(body.code, "sign-in code"), user_type: "Location", redirect_uri: need(body.redirectUri, "redirect URI")
+  });
+  const r = await call("https://services.leadconnectorhq.com/oauth/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: form.toString()
+  });
+  if (!r.ok || !r.json || !r.json.access_token) throw new HttpError(502, "GoHighLevel did not finish the sign-in. Try Connect GoHighLevel again." + (detail(r) ? " GoHighLevel said: " + detail(r) : ""));
+  if (!r.json.locationId) throw new HttpError(502, "GoHighLevel connected the agency, not a sub-account. Connect again and pick the sub-account the course should go into.");
+  return { ok: true, accessToken: r.json.access_token, locationId: r.json.locationId };
 }
 
 /* ---------- MCG (Mini Course Generator) ----------
@@ -475,6 +525,9 @@ async function aiGenerate(body, req) {
 
 const API = {
   "/api/ai/generate": aiGenerate,
+  "/api/whop/oauth/token": whopOauthToken,
+  "/api/whop/companies": whopCompanies,
+  "/api/ghl/oauth/token": ghlOauthToken,
   "/api/whop/check": whopCheck,
   "/api/whop/push": whopPush,
   "/api/ghl/push": ghlPush,
@@ -524,7 +577,7 @@ async function handle(req, res) {
   if (p === "/healthz") { send(res, 200, { ok: true }); return; }
 
   if (p === "/env.js") {
-    send(res, 200, "window.APP_ENV = " + JSON.stringify({ GOOGLE_CLIENT_ID, AI_HOSTED: !!GEMINI_API_KEY }) + ";", { "Content-Type": MIME[".js"] });
+    send(res, 200, "window.APP_ENV = " + JSON.stringify({ GOOGLE_CLIENT_ID, AI_HOSTED: !!GEMINI_API_KEY, WHOP_CLIENT_ID, GHL_CLIENT_ID: GHL_CLIENT_SECRET ? GHL_CLIENT_ID : "" }) + ";", { "Content-Type": MIME[".js"] });
     return;
   }
 
@@ -566,6 +619,8 @@ async function handle(req, res) {
 
   let rel = p === "/" ? "index.html" : p.slice(1);
   if (rel === "mcg-callback") rel = "mcg-callback.html";
+  /* Sign-in return addresses. GoHighLevel does not allow its own name in a return address, hence "crm". */
+  if (rel === "connect/whop/callback" || rel === "connect/crm/callback") rel = "oauth-callback.html";
   const file = safeJoin(PUBLIC_DIR, rel);
   if (!file) { send(res, 404, "Not found"); return; }
   serveFile(res, file);

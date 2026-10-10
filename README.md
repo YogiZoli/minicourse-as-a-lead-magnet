@@ -22,6 +22,19 @@ Environment variables on Railway:
 - `GOOGLE_CLIENT_ID`: public OAuth client ID for the YouTube playlist button.
 - `GEMINI_API_KEY`: the site's own Gemini key for one-click generation. Empty hides the "fast way" box.
 - Optional: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`, `AI_DAILY_LIMIT`.
+- `WHOP_CLIENT_ID`: the Whop app id (`app_...`) for the Connect Whop button. Empty means the panel asks for an API key.
+- `GHL_CLIENT_ID` and `GHL_CLIENT_SECRET`: the HighLevel Marketplace app for the Connect GoHighLevel button. Both empty means the panel asks for a Private Integration Token. The secret is used only on the server, for the token exchange.
+
+## Connect buttons (OAuth)
+
+| Platform | Return address to register in the platform's app | Scopes |
+|---|---|---|
+| Whop | `https://<domain>/connect/whop/callback` | `openid courses:read courses:update company:basic:read` |
+| GoHighLevel | `https://<domain>/connect/crm/callback` (HighLevel forbids its own name in a return address) | `courses.write` |
+| MCG | `https://<domain>/mcg-callback` (registered automatically per visitor) | `mcp` |
+| YouTube | none, only the JavaScript origin | `youtube.force-ssl` |
+
+Tokens from a Connect sign-in live in the visitor's tab memory only. Nothing is stored on the server. The API key and token fields still work, under "Use an API key instead".
 
 ## Design
 
