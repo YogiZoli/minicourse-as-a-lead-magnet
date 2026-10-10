@@ -19,3 +19,8 @@
 - 2026-10-10: Zoltan dropped the separate brand-design route. The brand design replaced the first look on the main page. Design source: `YogiZoli/design-system` `tokens.css` (v3 "Shine"), copied verbatim to `public/tokens.css`. App styles are in `public/app.css` and read role tokens only. Open Sans is embedded in the PDF from `public/fonts`.
 - 2026-10-10: Button roles: `.btn.big` is the one primary (fuchsia) action of a screen, plain `.btn` is the ink secondary, `.btn.ghost` is quiet.
 - 2026-10-10: Static files are served with `Cache-Control: no-cache`, so a reload always shows the current build.
+- 2026-10-10: Reliability pass. Rules that now hold everywhere: no request can hang (every call has a time limit), no raw error reaches the visitor, every long step shows a live status with seconds and says whether the tab must stay open, every error carries a ref that matches one server log line, and the visitor has an activity log to copy.
+- 2026-10-10: A 429 from a platform is retried up to 2 times (the platform refused without doing anything). A timeout on a create call is never retried, because the platform may have done it: the visitor is told to check there first.
+- 2026-10-10: The hosted AI answer is validated on the server. An incomplete outline counts as a failed model and the next model is tried. A model that worked is preferred for 15 minutes.
+- 2026-10-10: `Outline.normalize` skips anything that is not a real module or lesson and drops modules without lessons, so a sloppy AI answer cannot break a push.
+- 2026-10-10: Clearing the outline takes a second click. The browser warns before the tab is closed while work is running.

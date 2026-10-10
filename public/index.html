@@ -15,6 +15,12 @@
 
 <div class="wrap">
 
+  <noscript><p class="formerr">This page needs JavaScript. Turn it on in your browser and reload.</p></noscript>
+  <div class="formerr" id="crash" role="alert" hidden>
+    Something unexpected happened on this page. Your answers and your outline are still saved in this tab. Reload the page to carry on where you were.
+    <div class="actions" style="margin-top:8px"><button class="btn ghost" type="button" id="crashReload">Reload the page</button></div>
+  </div>
+
   <header>
     <h1>Minicourse as a Lead Magnet</h1>
     <p class="sub">Turn what you know into a complete course outline</p>
@@ -85,7 +91,7 @@
         <p class="formerr" id="hostedErr" role="alert" hidden></p>
         <div class="actions">
           <button class="btn big" type="button" id="hostedGo">Write my outline for me</button>
-          <span class="hint" id="hostedStatus" role="status"></span>
+          <p class="status" id="hostedStatus" role="status" hidden></p>
         </div>
       </div>
       <p class="hint" id="genHint">Two ways to do it. Both give the same result.</p>
@@ -135,7 +141,7 @@
         <p class="formerr" id="aiErr" role="alert" hidden></p>
         <div class="actions">
           <button class="btn big" type="button" id="aiGo">Generate my outline</button>
-          <span class="hint" id="aiStatus" role="status"></span>
+          <p class="status" id="aiStatus" role="status" hidden></p>
         </div>
       </div>
     </div>
@@ -273,6 +279,15 @@
 
     <div class="actions"><button class="btn ghost" type="button" id="startOver">Start a new outline</button></div>
   </section>
+
+  <details id="logBox">
+    <summary>Activity log <span class="chev">+</span></summary>
+    <div class="body">
+      <p class="hint">Everything this page did, with the time of each step. If something did not work, copy this and send it to us. It holds no keys or passwords.</p>
+      <div class="actions"><button class="btn ghost" type="button" id="logCopy">Copy the log</button></div>
+      <div class="copyblock" id="logText"></div>
+    </div>
+  </details>
 
   <footer>Your answers, keys and outline are never stored on our server.</footer>
 </div>

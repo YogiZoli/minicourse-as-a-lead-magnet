@@ -15,6 +15,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Part | State |
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
+| Reliability pass (time limits, live status, refs, activity log, crash notice, safe restart of saved work) | live. Every server error path probed with wrong keys and bad input. See README, "When something goes wrong" |
 | Brand design (Shine) on the main page, brand PDF with embedded Open Sans | live. Checked on phone width for the question, generation and result screens. Zoltan has not reviewed it yet |
 | One-click generation (server-side Gemini key) | works, tested locally (75 s when the first model was overloaded) |
 | Own AI key mode | Gemini only, verified with `scripts/test-ai.mjs`. Claude, ChatGPT and Grok are listed but disabled ("coming soon"). The Claude and ChatGPT calls exist in `callAi()` but are untested, Grok is not written |

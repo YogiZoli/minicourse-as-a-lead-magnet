@@ -33,19 +33,26 @@
   /* Returns a clean outline with every field present and positions renumbered, or throws in plain words. */
   function normalize(input) {
     var o = input && typeof input === "object" ? input : {};
+    /* Some AI apps wrap the outline in an extra layer or a one-item list. */
+    if (Array.isArray(o)) o = o[0] && typeof o[0] === "object" ? o[0] : {};
+    if (!o.course && o.outline && typeof o.outline === "object") o = o.outline;
     var c = o.course && typeof o.course === "object" ? o.course : {};
     var ua = c.unique_approach && typeof c.unique_approach === "object" ? c.unique_approach : {};
     var se = c.sessions && typeof c.sessions === "object" ? c.sessions : {};
-    var mods = Array.isArray(o.modules) ? o.modules : [];
+    var isObj = function (x) { return x && typeof x === "object" && !Array.isArray(x); };
+    /* Anything that is not a real module or lesson is skipped, and a module without lessons is dropped. */
+    var mods = (Array.isArray(o.modules) ? o.modules : []).filter(function (m) {
+      return isObj(m) && Array.isArray(m.lessons) && m.lessons.filter(isObj).length > 0;
+    });
     if (!s(c.title)) throw new Error("The outline has no course title.");
-    if (!mods.length) throw new Error("The outline has no modules.");
+    if (!mods.length) throw new Error("The outline has no modules with lessons. Ask your AI app to send the full JSON again.");
 
     var pos = 0;
     var modules = mods.map(function (m, i) {
-      var lessons = Array.isArray(m && m.lessons) ? m.lessons : [];
+      var lessons = m.lessons.filter(isObj);
       return {
         position: i + 1,
-        title: s(m.title) || "Module " + (i + 1),
+        title: s(m.title).slice(0, 200) || "Module " + (i + 1),
         outcome: s(m.outcome),
         lessons: lessons.map(function (l, j) {
           pos++;
@@ -53,7 +60,7 @@
           var d = l["do"] && typeof l["do"] === "object" ? l["do"] : {};
           var rv = l.review && typeof l.review === "object" ? l.review : {};
           var yt = l.youtube && typeof l.youtube === "object" ? l.youtube : {};
-          var title = s(l.title) || "Lesson " + (j + 1);
+          var title = s(l.title).slice(0, 200) || "Lesson " + (j + 1);
           return {
             position: j + 1,
             playlist_position: pos,
@@ -80,7 +87,7 @@
     return {
       schema_version: SCHEMA_VERSION,
       course: {
-        title: s(c.title),
+        title: s(c.title).slice(0, 200),
         format: s(c.format),
         bold_promise: s(c.bold_promise),
         ideal_client: s(c.ideal_client),

@@ -4,11 +4,25 @@
  *
  * The proxy forwards the visitor's own credentials, per request, to Whop, GHL,
  * MCG and YouTube. Nothing is stored. No database. Request bodies, keys and
- * tokens are never logged: the only log line per request is method, path, status.
+ * tokens are never logged.
+ *
+ * Tracing: every API request gets a short reference (ref). The visitor sees it
+ * next to an error, and the log line for that request carries the same ref with
+ * the path, status, duration and which outside service answered with what status.
  */
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const crypto = require("node:crypto");
+const { AsyncLocalStorage } = require("node:async_hooks");
+const Outline = require("./public/outline.js");
+
+/* Per-request trace: the ref and the list of outside calls. No content. */
+const trace = new AsyncLocalStorage();
+
+/* A bug in one request must never take the whole service down. */
+process.on("uncaughtException", (e) => { console.log("uncaughtException " + (e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e)); });
+process.on("unhandledRejection", (e) => { console.log("unhandledRejection " + (e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e)); });
 
 const PORT = process.env.PORT || 3000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
@@ -82,18 +96,35 @@ function need(v, label) {
   return s;
 }
 
-/* One outbound call. Returns status plus parsed body. Never throws on HTTP errors. */
-async function call(url, opts) {
+/* One outbound call. Returns status plus parsed body. Never throws. Status 0 means no answer (network or timeout). */
+async function callOnce(url, opts) {
+  const t = trace.getStore();
+  const host = (() => { try { return new URL(url).host; } catch (e) { return "?"; } })();
   let r;
   try {
     r = await fetch(url, Object.assign({ signal: AbortSignal.timeout(30000) }, opts));
   } catch (e) {
-    return { ok: false, status: 0, json: null, text: "" };
+    if (t) t.upstream.push(host + ":" + (e && e.name === "TimeoutError" ? "timeout" : "noanswer"));
+    return { ok: false, status: 0, json: null, text: "", headers: null };
   }
-  const text = await r.text();
+  let text = "";
+  try { text = await r.text(); } catch (e) { /* body cut off */ }
   let json = null;
   try { json = JSON.parse(text); } catch (e) { /* not json */ }
+  if (t) t.upstream.push(host + ":" + r.status);
   return { ok: r.ok, status: r.status, json, text, headers: r.headers };
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* A 429 means the platform refused the request without doing it, so it is safe to wait and send it again. */
+async function call(url, opts, noRetry) {
+  for (let attempt = 0; ; attempt++) {
+    const r = await callOnce(url, opts);
+    if (r.status !== 429 || noRetry || attempt >= 2) return r;
+    const asked = r.headers ? parseFloat(r.headers.get("retry-after")) : NaN;
+    await sleep(Math.min(8000, (asked > 0 ? asked : (attempt + 1) * 2) * 1000));
+  }
 }
 
 /* The platform's own words, trimmed, so the visitor sees what the platform said. */
@@ -116,7 +147,7 @@ function plain(platform, r) {
   const d = detail(r);
   const tail = d ? " " + platform + " said: " + d : "";
   switch (r.status) {
-    case 0: return "Could not reach " + platform + ". Check your connection and try again.";
+    case 0: return platform + " did not answer in time. It may be slow right now. Wait a minute and try again.";
     case 400: case 422: return platform + " did not accept the data." + tail;
     case 401: return platform + " did not accept that key or token. Check that you pasted all of it and that it has not been revoked." + tail;
     case 403: return "That key or token is valid but is not allowed to do this. Check its permissions." + tail;
@@ -183,6 +214,7 @@ async function whopPush(body) {
     body: JSON.stringify({ experience_id: experienceId, title: course.title, tagline: course.tagline || null, visibility: "hidden" })
   });
   if (!c.ok) throw new HttpError(502, plain("Whop", c));
+  if (!c.json || !c.json.id) throw new HttpError(502, "Whop answered, but not in the way we expected, so we stopped. Check in Whop whether an empty course was created.");
   created.courseId = c.json.id;
 
   /* Whop puts one placeholder chapter with one placeholder lesson into every new course.
@@ -195,7 +227,7 @@ async function whopPush(body) {
     const ch = reuse
       ? await send("PATCH", "/course_chapters/" + reuse.id, { title: m.title })
       : await send("POST", "/course_chapters", { course_id: created.courseId, title: m.title });
-    if (!ch.ok) throw new HttpError(502, plain("Whop", ch) + " The course was created, but it stopped at a chapter.", { created });
+    if (!ch.ok || !ch.json || !ch.json.id) throw new HttpError(502, plain("Whop", ch) + " The course was created, but it stopped at a chapter.", { created });
     created.chapters++;
     const spareLessons = reuse && Array.isArray(reuse.lessons) ? reuse.lessons.slice() : [];
     for (const l of m.lessons) {
@@ -317,6 +349,7 @@ async function mcgSession(token) {
     protocolVersion: "2025-06-18", capabilities: {},
     clientInfo: { name: "minicourse-as-a-lead-magnet", version: "2.0.0" }
   });
+  if (init.status === 401) throw new HttpError(401, "Your Mini Course Generator sign-in has expired. Click Connect Mini Course Generator and sign in again.");
   if (!init.ok) throw new HttpError(502, plain("Mini Course Generator", init));
   const session = init.session || "";
   await mcpCall(token, session, "notifications/initialized");
@@ -330,6 +363,7 @@ async function mcgRpc(body) {
   if (method !== "tools/list" && method !== "tools/call") throw new HttpError(400, "That call is not allowed.");
   const session = await mcgSession(token);
   const r = await mcpCall(token, session, method, body.params && typeof body.params === "object" ? body.params : undefined);
+  if (r.status === 401) throw new HttpError(401, "Your Mini Course Generator sign-in has expired. Click Connect Mini Course Generator and sign in again.");
   if (!r.ok) throw new HttpError(502, plain("Mini Course Generator", r));
   if (r.json && r.json.error) throw new HttpError(502, "Mini Course Generator said: " + String(r.json.error.message || "unknown error").slice(0, 300));
   return { ok: true, result: r.json ? r.json.result : null };
@@ -348,10 +382,12 @@ async function youtubePlaylist(body) {
   });
   if (!r.ok) {
     const reason = r.json && r.json.error && r.json.error.errors && r.json.error.errors[0] ? r.json.error.errors[0].reason : "";
+    if (r.status === 401) throw new HttpError(401, "Your Google sign-in has expired. Click Preview, then Confirm and create, and allow it again.");
     if (reason === "youtubeSignupRequired") throw new HttpError(502, "That Google account has no YouTube channel yet. Create a channel on YouTube first, then try again.");
     if (reason === "quotaExceeded") throw new HttpError(502, "The daily YouTube limit for this tool has been reached. Try again tomorrow.");
     throw new HttpError(502, plain("YouTube", r));
   }
+  if (!r.json || !r.json.id) throw new HttpError(502, "YouTube answered, but not in the way we expected. Check your channel: the playlist may have been created.");
   return { ok: true, playlistId: r.json.id, link: "https://www.youtube.com/playlist?list=" + r.json.id };
 }
 
@@ -370,6 +406,7 @@ const ANSWER_KEYS = ["expertise", "ideal_client", "problem", "bold_promise", "fo
 
 const aiHits = new Map();
 const aiDay = { date: "", n: 0 };
+const aiWorking = { model: "", until: 0 };
 
 async function aiGenerate(body, req) {
   if (!GEMINI_API_KEY) throw new HttpError(503, "One-click generation is not switched on. Use the Prompt Pack instead.");
@@ -388,25 +425,40 @@ async function aiGenerate(body, req) {
   h.n++; aiHits.set(ip, h); aiDay.n++;
   if (aiHits.size > 5000) aiHits.clear();
 
-  /* Gemini models are sometimes overloaded or retired, so the next model in the list is tried before giving up. */
+  /* Gemini models are sometimes overloaded or retired, so the next model in the list is tried before giving up.
+     The answer is checked here: the visitor only ever gets a complete, valid outline. */
   const payload = JSON.stringify({ contents: [{ parts: [{ text: buildPrompt(answers) }] }], generationConfig: { responseMimeType: "application/json" } });
-  let r = null;
-  for (const model of [GEMINI_MODEL].concat(GEMINI_FALLBACK_MODELS)) {
-    r = await call("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-      method: "POST", signal: AbortSignal.timeout(55000),
+  const order = [GEMINI_MODEL].concat(GEMINI_FALLBACK_MODELS).filter((m, i, a) => a.indexOf(m) === i);
+  if (aiWorking.model && Date.now() < aiWorking.until && order.indexOf(aiWorking.model) > 0) {
+    order.splice(order.indexOf(aiWorking.model), 1);
+    order.unshift(aiWorking.model);
+  }
+  const t = trace.getStore();
+  let outline = null, last = null;
+  for (const model of order) {
+    last = await call("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST", signal: AbortSignal.timeout(45000),
       headers: { "x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json" }, body: payload
-    });
-    if (r.ok || [0, 404, 429, 500, 503].indexOf(r.status) < 0) break;
+    }, true);
+    if (last.ok) {
+      const cand = last.json && last.json.candidates && last.json.candidates[0];
+      const text = cand && cand.content && cand.content.parts ? cand.content.parts.map((x) => x.text || "").join("") : "";
+      try { outline = Outline.normalize(Outline.extractJson(text)); }
+      catch (e) { outline = null; if (t) t.upstream.push(model + ":invalid-outline"); }
+      if (outline) {
+        /* Remember a model that works, so the next visitors do not wait on one that is hanging. */
+        aiWorking.model = model; aiWorking.until = Date.now() + 15 * 60000;
+        break;
+      }
+    } else if ([0, 404, 429, 500, 502, 503].indexOf(last.status) < 0) {
+      break;
+    }
   }
-  if (!r.ok) {
-    console.log("ai upstream status " + r.status);
-    if (r.status === 429 || r.status === 503) throw new HttpError(429, "The AI is busy right now. Try again in a minute, or use the Prompt Pack.");
-    throw new HttpError(502, "The AI could not write the outline just now. Try again, or use the Prompt Pack.");
+  if (!outline) {
+    if (last && (last.status === 401 || last.status === 403)) throw new HttpError(503, "One-click generation is switched off right now. Use the Prompt Pack below, it gives the same result.");
+    throw new HttpError(503, "The AI is busy right now and could not finish your outline. Your answers are safe. Try again in a minute, or use the Prompt Pack below.");
   }
-  const cand = r.json && r.json.candidates && r.json.candidates[0];
-  const text = cand && cand.content && cand.content.parts ? cand.content.parts.map((p) => p.text || "").join("") : "";
-  if (!text) throw new HttpError(502, "The AI sent back an empty answer. Try again.");
-  return { ok: true, text };
+  return { ok: true, outline };
 }
 
 /* ---------- routing ---------- */
@@ -454,10 +506,10 @@ function safeJoin(root, rel) {
   return file.indexOf(root) === 0 ? file : null;
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, "http://localhost");
-  const p = decodeURIComponent(url.pathname);
-  res.on("finish", () => { console.log(req.method + " " + p + " " + res.statusCode); });
+async function handle(req, res) {
+  let p;
+  try { p = decodeURIComponent(new URL(req.url, "http://localhost").pathname); }
+  catch (e) { send(res, 400, "Bad request"); return; }
 
   if (p === "/healthz") { send(res, 200, { ok: true }); return; }
 
@@ -467,17 +519,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (p.indexOf("/api/") === 0) {
+    const store = { ref: crypto.randomBytes(3).toString("hex"), upstream: [] };
+    const t0 = Date.now();
+    let status = 200, out, note = "";
     const handler = API[p];
-    if (!handler) { send(res, 404, { ok: false, error: "Unknown endpoint." }); return; }
-    if (req.method !== "POST") { send(res, 405, { ok: false, error: "Use POST." }); return; }
-    if (limited(req)) { send(res, 429, { ok: false, error: "Too many requests. Wait a minute and try again." }); return; }
-    try {
-      const body = await readJson(req);
-      send(res, 200, await handler(body, req));
-    } catch (e) {
-      if (e instanceof HttpError) send(res, e.status, Object.assign({ ok: false, error: e.message }, e.extra));
-      else send(res, 500, { ok: false, error: "Something went wrong on our side. Try again." });
+    if (!handler) { status = 404; out = { ok: false, error: "Unknown endpoint." }; }
+    else if (req.method !== "POST") { status = 405; out = { ok: false, error: "Use POST." }; }
+    else if (limited(req)) { status = 429; out = { ok: false, error: "Too many requests in a short time. Wait a minute and try again." }; }
+    else {
+      try {
+        const body = await readJson(req);
+        out = await trace.run(store, () => handler(body, req));
+      } catch (e) {
+        if (e instanceof HttpError) { status = e.status; out = Object.assign({ ok: false, error: e.message }, e.extra); }
+        else {
+          status = 500;
+          out = { ok: false, error: "Something went wrong on our side. Nothing was lost on your page. Try again in a minute." };
+          note = " bug=" + (e && e.stack ? e.stack.split("\n").slice(0, 2).join(" | ") : String(e));
+        }
+      }
     }
+    out.ref = store.ref;
+    /* One line per API request: ref, path, status, time, and which outside service said what. Never any content. */
+    console.log("api ref=" + store.ref + " " + p + " " + status + " " + (Date.now() - t0) + "ms" + (store.upstream.length ? " upstream=" + store.upstream.join(",") : "") + note);
+    send(res, status, out);
     return;
   }
 
@@ -494,6 +559,16 @@ const server = http.createServer(async (req, res) => {
   const file = safeJoin(PUBLIC_DIR, rel);
   if (!file) { send(res, 404, "Not found"); return; }
   serveFile(res, file);
+}
+
+const server = http.createServer((req, res) => {
+  handle(req, res).catch((e) => {
+    console.log("request failed " + (e && e.stack ? e.stack.split("\n").slice(0, 2).join(" | ") : e));
+    try { if (!res.headersSent) send(res, 500, { ok: false, error: "Something went wrong on our side. Try again in a minute." }); else res.end(); } catch (x) { /* socket gone */ }
+  });
 });
+server.on("clientError", (err, socket) => { try { socket.end("HTTP/1.1 400 Bad Request\r\n\r\n"); } catch (e) { /* socket gone */ } });
+/* Long pushes and generation need more than the default time. */
+server.requestTimeout = 240000;
 
 server.listen(PORT, () => { console.log("minicourse-as-a-lead-magnet listening on " + PORT); });

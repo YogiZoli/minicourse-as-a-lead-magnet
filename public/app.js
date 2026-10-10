@@ -51,11 +51,64 @@
     try{ document.execCommand("copy"); }catch(e){}
     t.remove();
   }
-  function api(path, body){
-    return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) })
-      .then(function(r){ return r.json().catch(function(){ return { ok:false, error:"The server sent an answer we could not read. Try again." }; }); },
-            function(){ return { ok:false, error:"Could not reach the server. Check your connection and try again." }; });
+  /* ---------- activity log: what this page did and when, so a problem can be traced ---------- */
+  var LOG = [];
+  try{ LOG = JSON.parse(sessionStorage.getItem("mc_log") || "[]") || []; }catch(e){ LOG = []; }
+  function logEvent(text){
+    LOG.push(new Date().toISOString().slice(11, 19) + " UTC  " + String(text).slice(0, 320));
+    if(LOG.length > 200) LOG = LOG.slice(-200);
+    try{ sessionStorage.setItem("mc_log", JSON.stringify(LOG)); }catch(e){}
+    var box = $("logText"); if(box) box.textContent = LOG.join("\n");
   }
+
+  /* ---------- running work: a live status line with seconds, and a warning before the tab is closed ---------- */
+  var running = 0;
+  window.addEventListener("beforeunload", function(ev){ if(running > 0){ ev.preventDefault(); ev.returnValue = ""; } });
+  function startWork(el, text){
+    var t0 = Date.now(), done = false;
+    running++;
+    function tick(){ var sec = Math.round((Date.now() - t0) / 1000); el.textContent = text + (sec >= 3 ? " " + sec + " seconds so far." : ""); }
+    el.hidden = false; tick();
+    var timer = setInterval(tick, 1000);
+    return function stop(){
+      if(done) return; done = true;
+      running = Math.max(0, running - 1);
+      clearInterval(timer); el.textContent = ""; el.hidden = true;
+    };
+  }
+
+  /* ---------- one call to our own server. Always resolves, never hangs, never shows a raw error. ---------- */
+  function api(path, body, timeoutMs, slowMsg){
+    var ctl = new AbortController(), timedOut = false;
+    var timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, timeoutMs || 60000);
+    return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body), signal:ctl.signal })
+      .then(function(r){
+        return r.json().catch(function(){ return { ok:false, error:"The server sent an answer we could not read (" + r.status + "). Try again in a minute." }; });
+      }, function(){
+        return { ok:false, error: timedOut
+          ? (slowMsg || "This is taking longer than it should, so we stopped waiting. It may still have gone through: check there before you try again.")
+          : "Could not reach the server. Check your internet connection and try again." };
+      }).then(function(r){
+        clearTimeout(timer);
+        if(!r || typeof r !== "object") r = { ok:false, error:"The server sent an empty answer. Try again." };
+        if(!r.ok && !r.error) r.error = "Something went wrong. Try again.";
+        if(!r.ok && r.ref) r.error += " (ref " + r.ref + ")";
+        logEvent(path + (r.ok ? " ok" + (r.ref ? " (ref " + r.ref + ")" : "") : " failed: " + r.error));
+        return r;
+      });
+  }
+
+  /* ---------- anything unexpected: a calm notice instead of a broken page ---------- */
+  function crash(what){
+    logEvent("page error: " + what);
+    var c = $("crash"); if(c) c.hidden = false;
+  }
+  window.addEventListener("error", function(ev){
+    if(ev && ev.filename && ev.filename.indexOf(location.origin) === 0) crash((ev.message || "script error") + " at " + ev.filename.replace(location.origin, "") + ":" + ev.lineno);
+  });
+  window.addEventListener("unhandledrejection", function(ev){
+    crash(ev && ev.reason && ev.reason.message ? ev.reason.message : String(ev && ev.reason));
+  });
 
   /* ================= questions ================= */
 
@@ -169,17 +222,19 @@
   $("genBack").addEventListener("click", function(){ S.i = 0; renderQuestion(); show("sQuiz", "qTitle"); });
   $("copyPrompt").addEventListener("click", function(){ copyText($("promptOut").value, this); });
 
-  function acceptOutline(text){
-    var o = Outline.normalize(Outline.extractJson(text));
+  function showOutline(o){
+    var k = Outline.counts(o);
     S.outline = o; save();
     renderResult();
     show("sResult", "rTitle");
+    logEvent("outline ready: " + k.modules + " modules, " + k.lessons + " lessons");
   }
+  function acceptOutline(text){ showOutline(Outline.normalize(Outline.extractJson(text))); }
   $("usePaste").addEventListener("click", function(){
     var t = $("pasteIn").value.trim();
     if(!t){ setErr($("pasteErr"), "Paste the answer from your AI app first."); $("pasteIn").focus(); return; }
     try{ setErr($("pasteErr"), ""); acceptOutline(t); }
-    catch(e){ setErr($("pasteErr"), e.message); }
+    catch(e){ setErr($("pasteErr"), e.message); logEvent("pasted answer not accepted: " + e.message); }
   });
 
   /* The AI key is kept in sessionStorage only and sent from this browser straight to the provider. */
@@ -222,14 +277,16 @@
         body:{ contents:[{ parts:[{ text:prompt }] }], generationConfig:{ responseMimeType:"application/json" } } };
       pick = function(j){ var c = j.candidates && j.candidates[0]; return c && c.content && c.content.parts ? c.content.parts.map(function(p){ return p.text || ""; }).join("") : ""; };
     }
-    return fetch(url, { method:"POST", headers:opts.headers, body:JSON.stringify(opts.body) }).then(function(r){
+    var ctl = new AbortController(), timer = setTimeout(function(){ ctl.abort(); }, 150000);
+    return fetch(url, { method:"POST", headers:opts.headers, body:JSON.stringify(opts.body), signal:ctl.signal }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){
         if(!r.ok) throw new Error(aiError(name, r.status, j));
         var text = pick(j);
         if(!text) throw new Error(name + " sent back an empty answer. Try again.");
         return text;
       });
-    }, function(){ throw new Error("Could not reach " + name + ". Check your connection and try again."); });
+    }, function(){ throw new Error(name + " did not answer. It may be busy, or your connection dropped. Try again in a minute."); })
+      .then(function(v){ clearTimeout(timer); return v; }, function(e){ clearTimeout(timer); throw e; });
   }
   /* One-click generation with the site's own AI key, which lives on the server. Shown only when it is switched on. */
   if(ENV.AI_HOSTED){
@@ -239,12 +296,14 @@
   $("hostedGo").addEventListener("click", function(){
     var btn = this;
     setErr($("hostedErr"), "");
-    btn.disabled = true; $("hostedStatus").textContent = "Writing your outline. This takes about a minute.";
-    api("/api/ai/generate", { answers:S.answers }).then(function(r){
+    btn.disabled = true;
+    var stop = startWork($("hostedStatus"), "Writing your outline. Usually under a minute, sometimes up to two. Keep this tab open.");
+    logEvent("one-click generation started");
+    api("/api/ai/generate", { answers:S.answers }, 175000, "The AI is taking too long right now, so we stopped waiting. Your answers are safe. Try again in a minute, or use the Prompt Pack below.").then(function(r){
       if(!r.ok) throw new Error(r.error);
-      acceptOutline(r.text);
+      showOutline(Outline.normalize(r.outline));
     }).catch(function(e){ setErr($("hostedErr"), e.message); })
-      .then(function(){ btn.disabled = false; $("hostedStatus").textContent = ""; });
+      .then(function(){ btn.disabled = false; stop(); });
   });
 
   $("aiGo").addEventListener("click", function(){
@@ -252,11 +311,13 @@
     if(!key){ setErr($("aiErr"), "Paste your API key first."); $("aiKey").focus(); return; }
     if(!model){ setErr($("aiErr"), "Enter a model name."); $("aiModel").focus(); return; }
     setErr($("aiErr"), ""); saveAi();
-    btn.disabled = true; $("aiStatus").textContent = "Writing your outline. This can take up to a minute.";
+    btn.disabled = true;
+    var stop = startWork($("aiStatus"), "Writing your outline with your own key. Usually under a minute. Keep this tab open.");
+    logEvent("own-key generation started: " + $("aiProvider").value + " " + model);
     callAi($("aiProvider").value, key, model, buildPrompt(S.answers)).then(function(text){
       acceptOutline(text);
-    }).catch(function(e){ setErr($("aiErr"), e.message); })
-      .then(function(){ btn.disabled = false; $("aiStatus").textContent = ""; });
+    }).catch(function(e){ setErr($("aiErr"), e.message); logEvent("own-key generation failed: " + e.message); })
+      .then(function(){ btn.disabled = false; stop(); });
   });
 
   /* ================= result ================= */
@@ -353,7 +414,11 @@
     loadPdfFonts().then(function(fonts){
       buildBlueprintPdf(S.outline, S.lead ? S.lead.name : "", PROGRAM_URL, fonts).save("my-course-blueprint.pdf");
       msg.textContent = "Check your downloads for the PDF.";
-    }).catch(function(){ msg.textContent = "The PDF could not be created. Reload the page and try again."; });
+      logEvent("pdf downloaded");
+    }).catch(function(e){
+      msg.textContent = "The PDF could not be created. Your outline is safe: download it as .md instead, or reload the page and try again.";
+      logEvent("pdf failed: " + (e && e.message));
+    });
   });
   $("dlMd").addEventListener("click", function(){ download(fileBase() + "-blueprint.md", Outline.blueprintMd(S.outline), "text/markdown;charset=utf-8"); });
   $("dlJson").addEventListener("click", function(){ download(fileBase() + "-outline.json", JSON.stringify(S.outline, null, 2), "application/json"); });
@@ -361,9 +426,18 @@
   $("dlBriefMd").addEventListener("click", function(){ download(fileBase() + "-video-course-content-brief.md", Outline.videoBriefMd(S.outline), "text/markdown;charset=utf-8"); });
   $("dlYtCsv").addEventListener("click", function(){ download(fileBase() + "-youtube-playlist.csv", Outline.youtubeCsv(S.outline), "text/csv;charset=utf-8"); });
   $("dlSkoolCsv").addEventListener("click", function(){ download(fileBase() + "-skool.csv", Outline.skoolCsv(S.outline), "text/csv;charset=utf-8"); });
+  /* Clearing the outline cannot be undone, so it takes a second click. */
   $("startOver").addEventListener("click", function(){
+    var b = this;
+    if(b.dataset.armed !== "1"){
+      b.dataset.armed = "1"; b.textContent = "Click again to clear this outline and start over";
+      setTimeout(function(){ b.dataset.armed = ""; b.textContent = "Start a new outline"; }, 6000);
+      return;
+    }
+    b.dataset.armed = ""; b.textContent = "Start a new outline";
     S.i = 0; S.answers = {}; S.outline = null; save();
     $("pasteIn").value = "";
+    logEvent("started over");
     show("sIntro");
   });
 
@@ -384,6 +458,8 @@
   var PUSH = {
     whop: {
       previewLabel:"Check my key and preview",
+      previewWait:"Checking your key with Whop. A few seconds.",
+      confirmWait:"Creating the course, its chapters and lessons in Whop, one by one. This takes up to a minute. Keep this tab open until you see the result.",
       preview:function(ui){
         var key = $("whopKey").value.trim(), company = $("whopCompany").value.trim();
         if(!key) return Promise.reject(new Error("Paste your Whop API key."));
@@ -398,12 +474,16 @@
         });
       },
       confirm:function(){
-        return api("/api/whop/push", { apiKey:$("whopKey").value.trim(), experienceId:$("whopExp").value, course:Outline.pushCourse(S.outline) });
+        return api("/api/whop/push", { apiKey:$("whopKey").value.trim(), experienceId:$("whopExp").value, course:Outline.pushCourse(S.outline) }, 200000).then(function(r){
+          if(!r.ok && r.created && r.created.courseId) r.error += " Whop already has part of it: 1 course, " + r.created.chapters + " chapters and " + r.created.lessons + " lessons. Delete that course in Whop before you try again, or you will get a second one.";
+          return r;
+        });
       },
-      done:function(r){ return "Created in Whop: " + r.created.chapters + " chapters and " + r.created.lessons + " lessons."; }
+      done:function(r){ return "Done. Created in Whop: 1 course, " + r.created.chapters + " chapters and " + r.created.lessons + " lessons, saved as hidden. Nothing is running any more, you can close this page."; }
     },
     ghl: {
       previewLabel:"Preview",
+      confirmWait:"Sending the course to GoHighLevel. A few seconds. Keep this tab open until you see the result.",
       preview:function(ui){
         var loc = $("ghlLocation").value.trim(), tok = $("ghlToken").value.trim();
         if(!loc) return Promise.reject(new Error("Enter your Location ID."));
@@ -416,11 +496,13 @@
       },
       done:function(){
         if(SNAPSHOT_URL){ $("snapshotLink").href = SNAPSHOT_URL; $("snapshotPanel").hidden = false; }
-        return "Import started in GoHighLevel. Lessons appear within a minute or two.";
+        return "Done on our side. GoHighLevel accepted the course and is importing it in the background. Lessons appear there within a minute or two. You can close this page, the import finishes by itself.";
       }
     },
     mcg: {
       previewLabel:"Connect Mini Course Generator",
+      previewWait:"Waiting for you to sign in in the small window. After that, Mini Course Generator checks the course. Nothing is created yet.",
+      confirmWait:"Creating the course and its lessons in Mini Course Generator. This takes up to a minute. Keep this tab open until you see the result.",
       /* The sign-in window has to open inside the click, before any waiting, or the browser blocks it. */
       preview:function(ui){
         var popup = mcg.token ? null : window.open("about:blank", "mcg_oauth", "width=520,height=720");
@@ -439,10 +521,11 @@
         });
       },
       confirm:function(){ return mcgCreate(); },
-      done:function(r){ return r.message || "Created in Mini Course Generator."; }
+      done:function(r){ return (r.message || "Created in Mini Course Generator.") + " Nothing is running any more, you can close this page."; }
     },
     youtube: {
       previewLabel:"Preview",
+      confirmWait:"Waiting for you in the Google window. After you allow it, the playlist is created in a few seconds.",
       preview:function(ui){
         if(!ENV.GOOGLE_CLIENT_ID) return Promise.reject(new Error("YouTube connect is not switched on for this page yet."));
         var title = $("ytTitle").value.trim();
@@ -454,46 +537,66 @@
       },
       confirm:function(){
         return googleToken().then(function(token){
-          return api("/api/youtube/playlist", { accessToken:token, title:$("ytTitle").value.trim(), description:$("ytDesc").value, privacy:$("ytPrivacy").value });
+          return api("/api/youtube/playlist", { accessToken:token, title:$("ytTitle").value.trim(), description:$("ytDesc").value, privacy:$("ytPrivacy").value }, 45000);
         });
       },
-      done:function(){ return "Your playlist is ready."; }
+      done:function(){ return "Done. Your empty playlist is ready on your channel. Nothing is running any more, you can close this page."; }
     }
   };
 
   function setupPush(host){
-    var def = PUSH[host.dataset.platform];
+    var name = host.dataset.platform, def = PUSH[name];
     host.innerHTML =
       '<p class="formerr" role="alert" hidden></p>' +
       '<div class="actions" data-r="start"><button class="btn" type="button" data-a="preview">' + esc(def.previewLabel) + '</button></div>' +
       '<div class="preview" hidden></div>' +
       '<div class="actions" data-r="confirm" hidden><button class="btn big" type="button" data-a="confirm">Confirm and create</button><button class="btn ghost" type="button" data-a="cancel">Cancel</button></div>' +
+      '<p class="status" role="status" hidden></p>' +
       '<p class="okmsg" role="status" hidden></p>';
     var ui = {
-      err:host.querySelector(".formerr"), preview:host.querySelector(".preview"), ok:host.querySelector(".okmsg"),
+      err:host.querySelector(".formerr"), preview:host.querySelector(".preview"), ok:host.querySelector(".okmsg"), status:host.querySelector(".status"),
       start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]')
     };
+    var busyNow = false;
     function reset(){ ui.preview.hidden = true; ui.confirm.hidden = true; ui.start.hidden = false; }
-    function busy(btn, on, label){ btn.disabled = on; if(on){ btn.dataset.label = btn.textContent; btn.textContent = label; } else if(btn.dataset.label){ btn.textContent = btn.dataset.label; } }
+    function lock(on){
+      busyNow = on;
+      Array.prototype.forEach.call(host.querySelectorAll("button"), function(b){ b.disabled = on; });
+    }
+    function fail(e){
+      setErr(ui.err, (e && e.message) || "Something went wrong. Try again.");
+      ui.err.scrollIntoView({ behavior:"smooth", block:"nearest" });
+    }
+    /* A step can fail before it even starts, so it always runs inside a promise. */
+    function run(step){ return Promise.resolve().then(step); }
 
     host.onclick = function(ev){
-      var b = ev.target.closest("button[data-a]"); if(!b) return;
-      var a = b.dataset.a;
+      var b = ev.target.closest("button[data-a]"); if(!b || busyNow) return;
+      var a = b.dataset.a, stop;
       if(a === "cancel"){ reset(); return; }
       setErr(ui.err, ""); ui.ok.hidden = true;
       if(a === "preview"){
-        busy(b, true, "Checking");
-        def.preview(ui).then(function(){
+        lock(true);
+        stop = startWork(ui.status, def.previewWait || "Checking.");
+        logEvent(name + ": preview started");
+        run(function(){ return def.preview(ui); }).then(function(){
           ui.preview.hidden = false; ui.confirm.hidden = false; ui.start.hidden = true;
-        }, function(e){ setErr(ui.err, e.message); }).then(function(){ busy(b, false); });
+          logEvent(name + ": preview shown, nothing created yet");
+        }, function(e){ logEvent(name + ": preview failed: " + (e && e.message)); fail(e); })
+          .then(function(){ stop(); lock(false); });
       } else if(a === "confirm"){
-        busy(b, true, "Creating");
-        def.confirm().then(function(r){
-          if(!r.ok) throw new Error(r.error);
+        lock(true);
+        stop = startWork(ui.status, def.confirmWait || "Creating. Keep this tab open.");
+        logEvent(name + ": create started");
+        run(function(){ return def.confirm(); }).then(function(r){
+          if(!r || !r.ok) throw new Error((r && r.error) || "Something went wrong. Try again.");
           reset();
           ui.ok.innerHTML = esc(def.done(r)) + (r.link ? ' <a href="' + esc(r.link) + '" target="_blank" rel="noopener">Open it</a>' : "");
           ui.ok.hidden = false;
-        }).catch(function(e){ setErr(ui.err, e.message); }).then(function(){ busy(b, false); });
+          ui.ok.scrollIntoView({ behavior:"smooth", block:"nearest" });
+          logEvent(name + ": created" + (r.link ? " " + r.link : ""));
+        }).catch(function(e){ logEvent(name + ": create failed: " + (e && e.message)); fail(e); })
+          .then(function(){ stop(); lock(false); });
       }
     };
   }
@@ -543,9 +646,9 @@
 
   /* One MCG tool call through the proxy. Resolves with the tool's text and parsed data, rejects with MCG's own words. */
   function mcgTool(name, args){
-    return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:name, arguments:args } }).then(function(r){
+    return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:name, arguments:args } }, 150000).then(function(r){
       if(!r.ok){
-        if(/401|did not accept/.test(r.error || "")) mcg.token = "";
+        if(/sign-in has expired|did not accept/.test(r.error || "")) mcg.token = "";
         throw new Error(r.error);
       }
       var res = r.result || {};
@@ -622,12 +725,27 @@
 
   /* ================= start ================= */
 
-  load();
-  loadAi();
-  if(S.lead){ $("leadName").value = S.lead.name; $("leadEmail").value = S.lead.email; }
-  if(S.screen === "sResult" && S.outline){ renderResult(); show("sResult"); }
-  else if(S.screen === "sGen" && S.lead){ openGen(); }
-  else if(S.screen === "sGate"){ show("sGate"); }
-  else if(S.screen === "sQuiz"){ renderQuestion(); show("sQuiz"); }
-  else { show("sIntro"); }
+  $("crashReload").addEventListener("click", function(){ location.reload(); });
+  $("logCopy").addEventListener("click", function(){ copyText(LOG.join("\n"), this); });
+  $("logText").textContent = LOG.join("\n");
+
+  /* If saved work cannot be shown for any reason, the page still opens: on the questions, with the answers kept. */
+  try{
+    load();
+    loadAi();
+    S.i = Math.min(Math.max(0, parseInt(S.i, 10) || 0), QUESTIONS.length - 1);
+    if(!S.answers || typeof S.answers !== "object") S.answers = {};
+    if(S.lead && S.lead.name){ $("leadName").value = S.lead.name; $("leadEmail").value = S.lead.email || ""; } else { S.lead = null; }
+    if(S.outline){ try{ S.outline = Outline.normalize(S.outline); }catch(e){ S.outline = null; logEvent("saved outline could not be read, it was dropped"); } }
+    if(S.screen === "sResult" && S.outline){ renderResult(); show("sResult"); }
+    else if((S.screen === "sGen" || S.screen === "sResult") && S.lead){ openGen(); }
+    else if(S.screen === "sGate"){ show("sGate"); }
+    else if(S.screen === "sQuiz"){ renderQuestion(); show("sQuiz"); }
+    else { show("sIntro"); }
+    logEvent("page opened on " + S.screen);
+  }catch(e){
+    logEvent("start failed: " + (e && e.message));
+    S.outline = null; S.screen = "sIntro"; save();
+    try{ show("sIntro"); }catch(x){}
+  }
 })();

@@ -135,6 +135,21 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;bor
 .preview ul{margin:0;padding-left:var(--space-6)}
 .cta{font-size:1rem;line-height:1.5}
 
+/* ---------- live status of running work ---------- */
+.status{
+  display:flex;align-items:flex-start;gap:var(--space-3);
+  font-size:var(--text-sm);line-height:var(--lh-sm);font-weight:var(--weight-semibold);color:var(--foreground);
+  background:var(--surface-alt);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);
+}
+.status::before{
+  content:"";flex:none;width:10px;height:10px;margin-top:6px;border-radius:var(--radius-full);
+  background:var(--live);animation:status-pulse 1.2s var(--ease-inout) infinite;
+}
+@keyframes status-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+.actions .status{flex:1;min-width:220px}
+#logText{font-family:var(--font-mono);font-size:var(--text-xs);line-height:1.6;max-height:260px;overflow:auto}
+#logBox{box-shadow:none;background:transparent}
+
 /* ---------- questions ---------- */
 .progress{height:6px;border-radius:var(--radius-full);background:var(--surface-alt);overflow:hidden}
 .progress i{display:block;height:100%;background:var(--hairline);border-radius:var(--radius-full);transition:width var(--duration-slow) var(--ease-out)}
