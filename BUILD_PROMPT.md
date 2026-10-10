@@ -30,7 +30,7 @@ FLOW
    Both modes produce one strict JSON outline schema (define it in /schema): course, modules, lessons with Teach / Do / Review, resources, and per lesson a YouTube title, description and playlist position.
 4. Outputs on the result screen:
    - PDF "My Course Blueprint" and .md
-   - Per lesson Video Brief, downloadable as .md AND as one combined .json for the whole course (title, keyword, hook, Teach / Do / Review, CTA, playlist position). My internal IdeaToVideo tool will import this later; keep the format clean, versioned (schema_version field) and documented in /schema/video-brief.md.
+   - Video Course Content Brief: one entry per lesson, downloadable as .md AND as one combined .json for the whole course (title, keyword, hook, Teach / Do / Review, CTA, playlist position). My internal IdeaToVideo tool will import this later; keep the format clean, versioned (schema_version field) and documented in /schema/video-course-content-brief.md.
    - YouTube playlist plan: ordered lessons with YouTube-optimized titles and descriptions (copy blocks, CSV).
 5. Direct push, built and tested IN THIS ORDER, each behind its own button, each with a dry-run preview, then confirm, then the created item's link or the platform error in plain words:
    1) Whop: create course, chapters, lessons via the official API with the user's Whop API key.
