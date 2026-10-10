@@ -20,7 +20,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
-| Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link format is a guess, not yet confirmed by eye |
+| Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the right company route |
 | MCG push | sign-in and tool listing built, course creation not built (tool list needed from a signed-in account) |
 | Skool export | works |
 | YouTube playlist | works end to end, tested live by Zoltan on 2026-10-10 (unlisted playlist created) |

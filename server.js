@@ -200,7 +200,7 @@ async function whopPush(body) {
       created.lessons++;
     }
   }
-  return { ok: true, created, link: "https://whop.com/joined/courses/" + experienceId + "/" };
+  return { ok: true, created, link: "https://whop.com/experiences/" + encodeURIComponent(experienceId) + "/" };
 }
 
 /* ---------- GHL ---------- */
