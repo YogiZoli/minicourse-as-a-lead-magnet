@@ -22,6 +22,13 @@ const MCG_MCP = "https://mcp.minicoursegenerator.com/mcp";
 const MCG_AUTH = "https://gateway.minicoursegenerator.com";
 const YT_PLAYLISTS = "https://www.googleapis.com/youtube/v3/playlists?part=snippet,status";
 
+/* Hosted generation: the site owner's own Gemini key, kept only in the Railway environment. */
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+const GEMINI_FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || "gemini-3-flash-preview,gemini-flash-lite-latest").split(",").map((m) => m.trim()).filter(Boolean);
+const AI_DAILY_LIMIT = parseInt(process.env.AI_DAILY_LIMIT || "200", 10);
+const AI_PER_VISITOR = 4;          // outlines per visitor address per 10 minutes
+
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
@@ -348,9 +355,64 @@ async function youtubePlaylist(body) {
   return { ok: true, playlistId: r.json.id, link: "https://www.youtube.com/playlist?list=" + r.json.id };
 }
 
+/* ---------- hosted AI generation ----------
+ * The prompt is built here from the answers, with the same builder the page uses,
+ * so this route can only write course outlines. Answers pass through and are not kept.
+ */
+
+const buildPrompt = (() => {
+  const ctx = {};
+  require("node:vm").runInNewContext(fs.readFileSync(path.join(PUBLIC_DIR, "questions.js"), "utf8") + "\nthis.buildPrompt = buildPrompt;", ctx);
+  return ctx.buildPrompt;
+})();
+const ANSWER_KEYS = ["expertise", "ideal_client", "problem", "bold_promise", "format", "delivered_by", "steps",
+  "unique_approach", "session_count", "session_minutes", "proof", "resources", "next_step"];
+
+const aiHits = new Map();
+const aiDay = { date: "", n: 0 };
+
+async function aiGenerate(body, req) {
+  if (!GEMINI_API_KEY) throw new HttpError(503, "One-click generation is not switched on. Use the Prompt Pack instead.");
+  const raw = body && typeof body.answers === "object" && body.answers ? body.answers : {};
+  const answers = {};
+  ANSWER_KEYS.forEach((k) => { answers[k] = str(raw[k], 1500); });
+  if (!answers.expertise || !answers.bold_promise) throw new HttpError(400, "Answer the questions first.");
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (aiDay.date !== today) { aiDay.date = today; aiDay.n = 0; }
+  if (aiDay.n >= AI_DAILY_LIMIT) throw new HttpError(429, "One-click generation has reached its limit for today. Use the Prompt Pack instead, it gives the same result.");
+  const ip = clientIp(req), now = Date.now();
+  const h = aiHits.get(ip) || { n: 0, t: now };
+  if (now - h.t > 600000) { h.n = 0; h.t = now; }
+  if (h.n >= AI_PER_VISITOR) throw new HttpError(429, "You have generated a few outlines in a row. Wait ten minutes, or use the Prompt Pack.");
+  h.n++; aiHits.set(ip, h); aiDay.n++;
+  if (aiHits.size > 5000) aiHits.clear();
+
+  /* Gemini models are sometimes overloaded or retired, so the next model in the list is tried before giving up. */
+  const payload = JSON.stringify({ contents: [{ parts: [{ text: buildPrompt(answers) }] }], generationConfig: { responseMimeType: "application/json" } });
+  let r = null;
+  for (const model of [GEMINI_MODEL].concat(GEMINI_FALLBACK_MODELS)) {
+    r = await call("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+      method: "POST", signal: AbortSignal.timeout(55000),
+      headers: { "x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json" }, body: payload
+    });
+    if (r.ok || [0, 404, 429, 500, 503].indexOf(r.status) < 0) break;
+  }
+  if (!r.ok) {
+    console.log("ai upstream status " + r.status);
+    if (r.status === 429 || r.status === 503) throw new HttpError(429, "The AI is busy right now. Try again in a minute, or use the Prompt Pack.");
+    throw new HttpError(502, "The AI could not write the outline just now. Try again, or use the Prompt Pack.");
+  }
+  const cand = r.json && r.json.candidates && r.json.candidates[0];
+  const text = cand && cand.content && cand.content.parts ? cand.content.parts.map((p) => p.text || "").join("") : "";
+  if (!text) throw new HttpError(502, "The AI sent back an empty answer. Try again.");
+  return { ok: true, text };
+}
+
 /* ---------- routing ---------- */
 
 const API = {
+  "/api/ai/generate": aiGenerate,
   "/api/whop/check": whopCheck,
   "/api/whop/push": whopPush,
   "/api/ghl/push": ghlPush,
@@ -362,8 +424,11 @@ const API = {
 
 /* Light per-address limit on the proxy. Counts only, no content. */
 const hits = new Map();
+function clientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+}
 function limited(req) {
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const ip = clientIp(req);
   const now = Date.now();
   const h = hits.get(ip) || { n: 0, t: now };
   if (now - h.t > 60000) { h.n = 0; h.t = now; }
@@ -397,7 +462,7 @@ const server = http.createServer(async (req, res) => {
   if (p === "/healthz") { send(res, 200, { ok: true }); return; }
 
   if (p === "/env.js") {
-    send(res, 200, "window.APP_ENV = " + JSON.stringify({ GOOGLE_CLIENT_ID }) + ";", { "Content-Type": MIME[".js"] });
+    send(res, 200, "window.APP_ENV = " + JSON.stringify({ GOOGLE_CLIENT_ID, AI_HOSTED: !!GEMINI_API_KEY }) + ";", { "Content-Type": MIME[".js"] });
     return;
   }
 
@@ -408,7 +473,7 @@ const server = http.createServer(async (req, res) => {
     if (limited(req)) { send(res, 429, { ok: false, error: "Too many requests. Wait a minute and try again." }); return; }
     try {
       const body = await readJson(req);
-      send(res, 200, await handler(body));
+      send(res, 200, await handler(body, req));
     } catch (e) {
       if (e instanceof HttpError) send(res, e.status, Object.assign({ ok: false, error: e.message }, e.extra));
       else send(res, 500, { ok: false, error: "Something went wrong on our side. Try again." });

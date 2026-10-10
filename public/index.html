@@ -214,7 +214,16 @@
   <section class="screen" id="sGen" hidden>
     <div class="card">
       <h2 id="genTitle" tabindex="-1">Build your outline</h2>
-      <p class="hint">Two ways to do it. Both give the same result.</p>
+      <div class="preview" id="hostedBox" hidden>
+        <strong>The fast way</strong>
+        <span>One click, about half a minute. Free, no account and no key needed.</span>
+        <p class="formerr" id="hostedErr" role="alert" hidden></p>
+        <div class="actions">
+          <button class="btn big" type="button" id="hostedGo">Write my outline for me</button>
+          <span class="hint" id="hostedStatus" role="status"></span>
+        </div>
+      </div>
+      <p class="hint" id="genHint">Two ways to do it. Both give the same result.</p>
       <div class="tabs" role="tablist">
         <button class="tab" type="button" role="tab" id="tabPack" aria-selected="true" aria-controls="panePack">Prompt Pack</button>
         <button class="tab" type="button" role="tab" id="tabKey" aria-selected="false" aria-controls="paneKey">My own AI key</button>

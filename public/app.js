@@ -231,6 +231,22 @@
       });
     }, function(){ throw new Error("Could not reach " + name + ". Check your connection and try again."); });
   }
+  /* One-click generation with the site's own AI key, which lives on the server. Shown only when it is switched on. */
+  if(ENV.AI_HOSTED){
+    $("hostedBox").hidden = false;
+    $("genHint").textContent = "Or do it yourself. Both ways give the same result.";
+  }
+  $("hostedGo").addEventListener("click", function(){
+    var btn = this;
+    setErr($("hostedErr"), "");
+    btn.disabled = true; $("hostedStatus").textContent = "Writing your outline. This takes about half a minute.";
+    api("/api/ai/generate", { answers:S.answers }).then(function(r){
+      if(!r.ok) throw new Error(r.error);
+      acceptOutline(r.text);
+    }).catch(function(e){ setErr($("hostedErr"), e.message); })
+      .then(function(){ btn.disabled = false; $("hostedStatus").textContent = ""; });
+  });
+
   $("aiGo").addEventListener("click", function(){
     var btn = this, key = $("aiKey").value.trim(), model = $("aiModel").value.trim();
     if(!key){ setErr($("aiErr"), "Paste your API key first."); $("aiKey").focus(); return; }
