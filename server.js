@@ -407,6 +407,7 @@ const ANSWER_KEYS = ["expertise", "ideal_client", "problem", "bold_promise", "fo
 const aiHits = new Map();
 const aiDay = { date: "", n: 0 };
 const aiWorking = { model: "", until: 0 };
+const aiResting = new Map();   // model -> time until which it is skipped, after it hung or failed
 
 async function aiGenerate(body, req) {
   if (!GEMINI_API_KEY) throw new HttpError(503, "One-click generation is not switched on. Use the Prompt Pack instead.");
@@ -428,7 +429,11 @@ async function aiGenerate(body, req) {
   /* Gemini models are sometimes overloaded or retired, so the next model in the list is tried before giving up.
      The answer is checked here: the visitor only ever gets a complete, valid outline. */
   const payload = JSON.stringify({ contents: [{ parts: [{ text: buildPrompt(answers) }] }], generationConfig: { responseMimeType: "application/json" } });
-  const order = [GEMINI_MODEL].concat(GEMINI_FALLBACK_MODELS).filter((m, i, a) => a.indexOf(m) === i);
+  const all = [GEMINI_MODEL].concat(GEMINI_FALLBACK_MODELS).filter((m, i, a) => a.indexOf(m) === i);
+  /* A model that just hung or failed rests for 10 minutes, so the next visitors do not wait on it again.
+     If every model is resting, all of them are tried anyway. */
+  const fresh = all.filter((m) => !(aiResting.get(m) > Date.now()));
+  const order = fresh.length ? fresh.concat(all.filter((m) => fresh.indexOf(m) < 0)) : all.slice();
   if (aiWorking.model && Date.now() < aiWorking.until && order.indexOf(aiWorking.model) > 0) {
     order.splice(order.indexOf(aiWorking.model), 1);
     order.unshift(aiWorking.model);
@@ -444,14 +449,19 @@ async function aiGenerate(body, req) {
       const cand = last.json && last.json.candidates && last.json.candidates[0];
       const text = cand && cand.content && cand.content.parts ? cand.content.parts.map((x) => x.text || "").join("") : "";
       try { outline = Outline.normalize(Outline.extractJson(text)); }
-      catch (e) { outline = null; if (t) t.upstream.push(model + ":invalid-outline"); }
+      catch (e) { outline = null; if (t) t.upstream.push(model + ":invalid-outline(" + String(e.message).slice(0, 40) + ")"); }
       if (outline) {
         /* Remember a model that works, so the next visitors do not wait on one that is hanging. */
         aiWorking.model = model; aiWorking.until = Date.now() + 15 * 60000;
+        aiResting.delete(model);
         break;
       }
+      if (aiWorking.model === model) aiWorking.until = 0;
     } else if ([0, 404, 429, 500, 502, 503].indexOf(last.status) < 0) {
       break;
+    } else {
+      aiResting.set(model, Date.now() + 10 * 60000);
+      if (aiWorking.model === model) aiWorking.until = 0;
     }
   }
   if (!outline) {

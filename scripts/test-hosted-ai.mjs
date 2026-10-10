@@ -27,6 +27,6 @@ const r = await post({ answers: {
   session_count: "4", session_minutes: "10", resources: "Feeding chart", next_step: "Join my Bread Club"
 } });
 if (!r.json.ok) { console.log("FAIL", r.status, r.json); process.exit(1); }
-const o = Outline.normalize(Outline.extractJson(r.json.text));
+const o = Outline.normalize(r.json.outline);
 const k = Outline.counts(o);
 console.log("ok in " + Math.round((Date.now() - t0) / 1000) + "s:", o.course.title, "|", k.modules, "modules,", k.lessons, "lessons");
