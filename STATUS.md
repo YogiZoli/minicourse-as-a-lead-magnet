@@ -15,6 +15,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Part | State |
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
+| Detailed logging (structured server log, page events, session and ref codes, `scripts/logs.mjs`) | live. See README, "Logging" |
 | Reliability pass (time limits, live status, refs, activity log, crash notice, safe restart of saved work) | live. Every server error path probed with wrong keys and bad input. See README, "When something goes wrong" |
 | Brand design (Shine) on the main page, brand PDF with embedded Open Sans | live. Checked on phone width for the question, generation and result screens. Zoltan has not reviewed it yet |
 | One-click generation (server-side Gemini key) | works live. 14 s when the first model answers, about 65 s when it hangs and the next one takes over |

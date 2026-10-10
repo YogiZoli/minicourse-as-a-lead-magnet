@@ -22,7 +22,7 @@ Environment variables on Railway:
 - `GOOGLE_CLIENT_ID`: public OAuth client ID for the YouTube playlist button.
 - `GEMINI_API_KEY`: the site's own Gemini key for one-click generation. Empty hides the "fast way" box.
 - Optional: `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`, `AI_DAILY_LIMIT`.
-- `WHOP_CLIENT_ID`: the Whop app id (`app_...`) for the Connect Whop button. Empty means the panel asks for an API key.
+- `WHOP_CLIENT_ID`: the Whop app id (`app_...`) for the Connect Whop button. Empty means the panel asks for an API key. Set the Whop app to "Public" in its OAuth tab. If it stays "Confidential", also set `WHOP_CLIENT_SECRET`.
 - `GHL_CLIENT_ID` and `GHL_CLIENT_SECRET`: the HighLevel Marketplace app for the Connect GoHighLevel button. Both empty means the panel asks for a Private Integration Token. The secret is used only on the server, for the token exchange.
 
 ## Connect buttons (OAuth)
@@ -55,21 +55,50 @@ Zoltan Gero "Shine" design system. `public/tokens.css` is a verbatim copy of `Yo
 | `schema/video-course-content-brief.md` | The video brief format for IdeaToVideo |
 | `schema/example-outline.json` | A small test outline |
 
-## When something goes wrong: how to trace it
+## Logging: how to find out what happened
 
-- Every API request gets a short reference, for example `ref 2aa496`. The visitor sees it at the end of the error message.
-- The visitor also has an "Activity log" at the bottom of the page with the time of every step. They can copy it and send it. It holds no keys.
-- On the server, each API request writes one line with the same ref: path, status, duration, and which outside service answered with what status. No content, keys or tokens.
+Everything is in the Railway log of the service. Every line is one JSON object, so it can be filtered on any field.
 
-Find a request in the Railway logs by its ref:
+**Read it from this folder:**
 
 ```text
-railway logs -s minicourse-as-a-lead-magnet | findstr 2aa496
+node scripts/logs.mjs
+node scripts/logs.mjs errors
+node scripts/logs.mjs ref 2aa496
+node scripts/logs.mjs session io7mblyuk5
+node scripts/logs.mjs find whop
+node scripts/logs.mjs full ref 2aa496
 ```
 
-Example line: `api ref=2aa496 /api/ghl/push 502 508ms upstream=services.leadconnectorhq.com:401`
+Add a number at the end to look further back, for example `node scripts/logs.mjs errors 5000`.
 
-Reading `upstream`: a status number is what the platform answered, `timeout` means it did not answer in time, `noanswer` means the connection failed, `invalid-outline` means an AI model answered but the outline was not complete. A line with `bug=` is an error in our own code.
+**Where the two codes come from:**
+
+- `ref`: the visitor sees it at the end of every error message, for example `(ref 2aa496)`. It names one request.
+- `session`: the first line of the "Activity log" at the bottom of the page. It names one browser tab, so it shows the visitor's whole path.
+
+**What is logged (the `event` field):**
+
+| event | when | what it carries |
+|---|---|---|
+| `server_start`, `server_stop` | start and redeploy | which features are on, the AI model order, uptime |
+| `page_view` | the page is opened | browser, where the visitor came from |
+| `api_start` | a request arrives | ref, path, size, session, visitor |
+| `api_end` | a request is answered | status, duration, every outside call (`upstream`), every step (`steps`), the message the visitor was shown (`shown`), a stack if it was our bug (`bug`) |
+| `page` | the visitor's page reports something | screen changes, each question answered (not the answer), sign-in windows opening and closing, pushes started and failed, downloads, files that did not load, page errors, going offline, the tab being closed while work was running |
+| `signin_return` | a sign-in window comes back | whether it carried a code or an error, never the code |
+| `not_found`, `bad_method`, `bad_request` | odd requests | the path |
+| `crash` | anything outside the normal path | message and stack |
+
+An `upstream` entry is one call to Whop, GoHighLevel, MCG, YouTube or Gemini: host, path, status, duration, and on a refusal the service's own words (`said`). `result: timeout` means it did not answer in time, `noanswer` means the connection failed.
+
+**Levels:** `error` is ours to fix or a service that did not answer. `warn` is something the visitor can fix (a wrong key, a closed window). `info` is the normal path.
+
+**What is never logged:** keys, tokens, passwords, answers, outlines, names, emails. Anything that looks like a key is masked on the page and again on the server. A visitor is a short code made from the day and the address, the address itself is not written down.
+
+**If nothing seems to have happened:** an `api_start` without an `api_end` means the server stopped mid-request (look for `server_stop` or `crash` right after it). A session whose last line is "page closed or hidden WHILE WORK WAS RUNNING" means the visitor left during a push. No lines at all for a session means the request never reached us: the visitor's own activity log will say "could not be reached".
+
+**How long it is kept:** as long as Railway keeps logs for the plan the project is on. Nothing is copied anywhere else.
 
 ## Run
 

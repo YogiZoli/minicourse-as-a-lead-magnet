@@ -6,9 +6,14 @@
  * MCG and YouTube. Nothing is stored. No database. Request bodies, keys and
  * tokens are never logged.
  *
- * Tracing: every API request gets a short reference (ref). The visitor sees it
- * next to an error, and the log line for that request carries the same ref with
- * the path, status, duration and which outside service answered with what status.
+ * Logging: every line is one JSON object (level, message, event, time and details),
+ * so the Railway log explorer can filter on any field. See README, "Logging".
+ * What is logged: page views, every API request (start and end), every call to an
+ * outside service with its status, duration and the service's own error text, every
+ * step inside a push, every limit that was hit, every crash, and the events the
+ * visitor's page reports (screen changes, clicks that start work, failures, page errors).
+ * What is never logged: keys, tokens, passwords, answers, outlines, names, emails.
+ * Anything that looks like a key is masked before a line is written.
  */
 const http = require("node:http");
 const fs = require("node:fs");
@@ -17,17 +22,53 @@ const crypto = require("node:crypto");
 const { AsyncLocalStorage } = require("node:async_hooks");
 const Outline = require("./public/outline.js");
 
-/* Per-request trace: the ref and the list of outside calls. No content. */
+/* Per-request trace: the ref, the outside calls and the steps taken. No content. */
 const trace = new AsyncLocalStorage();
 
-/* A bug in one request must never take the whole service down. */
-process.on("uncaughtException", (e) => { console.log("uncaughtException " + (e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e)); });
-process.on("unhandledRejection", (e) => { console.log("unhandledRejection " + (e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e)); });
+/* ---------- logging ---------- */
+
+const BUILD = (process.env.RAILWAY_DEPLOYMENT_ID || "local").slice(0, 8);
+const KEYLIKE = /\b(apik_|pit-|sk-ant-|sk-|AIza|AQ\.|ya29\.|GOCSPX-|eyJ)[A-Za-z0-9._\-]{6,}/g;
+const BEARER = /Bearer\s+\S+/gi;
+const LONGTOKEN = /[A-Za-z0-9_\-]{44,}/g;
+
+/* Masks anything that looks like a key or token, in any text, at any depth. */
+function mask(v, depth) {
+  if (typeof v === "string") return v.replace(BEARER, "Bearer [hidden]").replace(KEYLIKE, "$1[hidden]").replace(LONGTOKEN, "[hidden]").slice(0, 700);
+  if (v === null || typeof v !== "object") return v;
+  if ((depth || 0) > 5) return "[deep]";
+  if (Array.isArray(v)) return v.slice(0, 60).map((x) => mask(x, (depth || 0) + 1));
+  const out = {};
+  Object.keys(v).slice(0, 60).forEach((k) => { out[k] = mask(v[k], (depth || 0) + 1); });
+  return out;
+}
+
+/* One JSON line. level: info, warn or error. event: a fixed name to filter on. message: the line in plain words. */
+function log(level, event, message, data) {
+  let line;
+  try { line = JSON.stringify(Object.assign({ level, message: mask(String(message)), event, time: new Date().toISOString(), build: BUILD }, mask(data || {}))); }
+  catch (e) { line = JSON.stringify({ level: "error", message: "a log line could not be written", event: "log_failed", time: new Date().toISOString() }); }
+  console.log(line);
+}
+
+/* A step inside the current request. It ends up in that request's api_end line, with the time since the request began. */
+function step(name, data) {
+  const t = trace.getStore();
+  if (t) t.steps.push(Object.assign({ step: name, at_ms: Date.now() - t.t0 }, data || {}));
+}
+
+function stackOf(e) { return e && e.stack ? e.stack.split("\n").slice(0, 6).map((x) => x.trim()) : [String(e)]; }
+
+/* A bug in one request must never take the whole service down, and it must leave a trace. */
+process.on("uncaughtException", (e) => { log("error", "crash", "uncaught exception: " + (e && e.message), { stack: stackOf(e) }); });
+process.on("unhandledRejection", (e) => { log("error", "crash", "unhandled rejection: " + (e && e.message), { stack: stackOf(e) }); });
 
 const PORT = process.env.PORT || 3000;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 /* "Connect" buttons. The ids are public. Only the GHL secret is private, and it never leaves this server. */
 const WHOP_CLIENT_ID = process.env.WHOP_CLIENT_ID || "";
+/* Only needed if the Whop app is set to "Confidential". A "Public" Whop app needs no secret. */
+const WHOP_CLIENT_SECRET = process.env.WHOP_CLIENT_SECRET || "";
 const GHL_CLIENT_ID = process.env.GHL_CLIENT_ID || "";
 const GHL_CLIENT_SECRET = process.env.GHL_CLIENT_SECRET || "";
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -103,19 +144,27 @@ function need(v, label) {
 /* One outbound call. Returns status plus parsed body. Never throws. Status 0 means no answer (network or timeout). */
 async function callOnce(url, opts) {
   const t = trace.getStore();
-  const host = (() => { try { return new URL(url).host; } catch (e) { return "?"; } })();
+  const rec = { host: "?", path: "", method: (opts && opts.method) || "GET", status: 0, ms: 0 };
+  try { const u = new URL(url); rec.host = u.host; rec.path = u.pathname; } catch (e) { /* keep "?" */ }
+  const t1 = Date.now();
   let r;
   try {
     r = await fetch(url, Object.assign({ signal: AbortSignal.timeout(30000) }, opts));
   } catch (e) {
-    if (t) t.upstream.push(host + ":" + (e && e.name === "TimeoutError" ? "timeout" : "noanswer"));
+    rec.ms = Date.now() - t1;
+    rec.result = e && e.name === "TimeoutError" ? "timeout" : "noanswer";
+    rec.error = String((e && e.cause && (e.cause.code || e.cause.message)) || (e && e.message) || e).slice(0, 160);
+    if (t) t.upstream.push(rec);
     return { ok: false, status: 0, json: null, text: "", headers: null };
   }
   let text = "";
-  try { text = await r.text(); } catch (e) { /* body cut off */ }
+  try { text = await r.text(); } catch (e) { rec.bodyCut = true; }
   let json = null;
   try { json = JSON.parse(text); } catch (e) { /* not json */ }
-  if (t) t.upstream.push(host + ":" + r.status);
+  rec.status = r.status; rec.ms = Date.now() - t1; rec.bytes = text.length;
+  /* On a refusal, keep the service's own words: they are the fastest way to see what went wrong. */
+  if (!r.ok) rec.said = detail({ json }) || text.replace(/\s+/g, " ").slice(0, 240);
+  if (t) t.upstream.push(rec);
   return { ok: r.ok, status: r.status, json, text, headers: r.headers };
 }
 
@@ -127,7 +176,9 @@ async function call(url, opts, noRetry) {
     const r = await callOnce(url, opts);
     if (r.status !== 429 || noRetry || attempt >= 2) return r;
     const asked = r.headers ? parseFloat(r.headers.get("retry-after")) : NaN;
-    await sleep(Math.min(8000, (asked > 0 ? asked : (attempt + 1) * 2) * 1000));
+    const wait = Math.min(8000, (asked > 0 ? asked : (attempt + 1) * 2) * 1000);
+    step("waiting_after_429", { wait_ms: wait, attempt: attempt + 1 });
+    await sleep(wait);
   }
 }
 
@@ -183,6 +234,7 @@ function readCourse(body) {
     };
   });
   if (lessonCount > 120) throw new HttpError(400, "Too many lessons.");
+  step("course_read", { modules: clean.length, lessons: lessonCount });
   return { title, tagline: str(c.tagline, 240), description: str(c.description, 5000), modules: clean };
 }
 
@@ -203,6 +255,7 @@ async function whopCheck(body) {
     id: e.id, name: e.name, app: e.app && e.app.name ? e.app.name : "",
     isCourses: !!(e.app && /course/i.test(e.app.name || ""))
   }));
+  step("whop_experiences", { total: experiences.length, courses: experiences.filter((e) => e.isCourses).length });
   return { ok: true, experiences };
 }
 
@@ -211,13 +264,14 @@ async function whopOauthToken(body) {
   if (!WHOP_CLIENT_ID) throw new HttpError(503, "Connect Whop is not switched on. Use an API key instead.");
   const r = await call("https://api.whop.com/oauth/token", {
     method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify(Object.assign({
       grant_type: "authorization_code", code: need(body.code, "sign-in code"),
       redirect_uri: need(body.redirectUri, "redirect URI"), client_id: WHOP_CLIENT_ID,
       code_verifier: need(body.codeVerifier, "code verifier")
-    })
+    }, WHOP_CLIENT_SECRET ? { client_secret: WHOP_CLIENT_SECRET } : {}))
   });
   if (!r.ok || !r.json || !r.json.access_token) throw new HttpError(502, "Whop did not finish the sign-in. Try Connect Whop again." + (detail(r) ? " Whop said: " + detail(r) : ""));
+  step("whop_connected", { scope: String(r.json.scope || "").slice(0, 200) });
   return { ok: true, accessToken: r.json.access_token };
 }
 
@@ -234,6 +288,7 @@ async function whopCompanies(body) {
     else if (typeof c === "string") list = [{ id: c, title: c }];
   }
   if (!list.length && !r.ok) throw new HttpError(502, plain("Whop", r));
+  step("whop_companies", { found: list.length, list_status: r.status });
   return { ok: true, companies: list.map((c) => ({ id: c.id, title: c.title || c.name || c.id })) };
 }
 
@@ -251,6 +306,7 @@ async function whopPush(body) {
   if (!c.ok) throw new HttpError(502, plain("Whop", c));
   if (!c.json || !c.json.id) throw new HttpError(502, "Whop answered, but not in the way we expected, so we stopped. Check in Whop whether an empty course was created.");
   created.courseId = c.json.id;
+  step("whop_course_created", { courseId: created.courseId, placeholders: Array.isArray(c.json.chapters) ? c.json.chapters.length : 0 });
 
   /* Whop puts one placeholder chapter with one placeholder lesson into every new course.
      They are filled with the first module and lesson, so nothing empty is left behind. */
@@ -262,7 +318,10 @@ async function whopPush(body) {
     const ch = reuse
       ? await send("PATCH", "/course_chapters/" + reuse.id, { title: m.title })
       : await send("POST", "/course_chapters", { course_id: created.courseId, title: m.title });
-    if (!ch.ok || !ch.json || !ch.json.id) throw new HttpError(502, plain("Whop", ch) + " The course was created, but it stopped at a chapter.", { created });
+    if (!ch.ok || !ch.json || !ch.json.id) {
+      step("whop_stopped", { at: "chapter", chapter: created.chapters + 1, created });
+      throw new HttpError(502, plain("Whop", ch) + " The course was created, but it stopped at a chapter.", { created });
+    }
     created.chapters++;
     const spareLessons = reuse && Array.isArray(reuse.lessons) ? reuse.lessons.slice() : [];
     for (const l of m.lessons) {
@@ -270,10 +329,14 @@ async function whopPush(body) {
       const ls = old
         ? await send("PATCH", "/course_lessons/" + old.id, { lesson_type: "text", title: l.title, content: l.content_md })
         : await send("POST", "/course_lessons", { chapter_id: ch.json.id, lesson_type: "text", title: l.title, content: l.content_md });
-      if (!ls.ok) throw new HttpError(502, plain("Whop", ls) + " The course was created, but it stopped at a lesson.", { created });
+      if (!ls.ok) {
+        step("whop_stopped", { at: "lesson", chapter: created.chapters, lesson: created.lessons + 1, created });
+        throw new HttpError(502, plain("Whop", ls) + " The course was created, but it stopped at a lesson.", { created });
+      }
       created.lessons++;
     }
   }
+  step("whop_done", created);
   return { ok: true, created, link: "https://whop.com/experiences/" + encodeURIComponent(experienceId) + "/" };
 }
 
@@ -304,6 +367,7 @@ async function ghlPush(body) {
   });
   if (!r.ok) throw new HttpError(502, plain("GoHighLevel", r));
   const first = r.json && Array.isArray(r.json.processingCourses) ? r.json.processingCourses[0] : null;
+  step("ghl_accepted", { locationId, courseId: first ? first.id : "", said: (r.json && r.json.message) || "" });
   return {
     ok: true,
     message: (r.json && r.json.message) || "Import started.",
@@ -325,6 +389,7 @@ async function ghlOauthToken(body) {
   });
   if (!r.ok || !r.json || !r.json.access_token) throw new HttpError(502, "GoHighLevel did not finish the sign-in. Try Connect GoHighLevel again." + (detail(r) ? " GoHighLevel said: " + detail(r) : ""));
   if (!r.json.locationId) throw new HttpError(502, "GoHighLevel connected the agency, not a sub-account. Connect again and pick the sub-account the course should go into.");
+  step("ghl_connected", { locationId: r.json.locationId, userType: r.json.userType || "", scope: String(r.json.scope || "").slice(0, 200) });
   return { ok: true, accessToken: r.json.access_token, locationId: r.json.locationId };
 }
 
@@ -411,12 +476,22 @@ async function mcgRpc(body) {
   const token = need(body.accessToken, "MCG sign-in");
   const method = need(body.method, "method");
   if (method !== "tools/list" && method !== "tools/call") throw new HttpError(400, "That call is not allowed.");
+  const params = body.params && typeof body.params === "object" ? body.params : undefined;
+  step("mcg_call", { method, tool: params && params.name ? String(params.name) : "", dryRun: !!(params && params.arguments && params.arguments.dryRun) });
   const session = await mcgSession(token);
-  const r = await mcpCall(token, session, method, body.params && typeof body.params === "object" ? body.params : undefined);
+  const r = await mcpCall(token, session, method, params);
   if (r.status === 401) throw new HttpError(401, "Your Mini Course Generator sign-in has expired. Click Connect Mini Course Generator and sign in again.");
   if (!r.ok) throw new HttpError(502, plain("Mini Course Generator", r));
   if (r.json && r.json.error) throw new HttpError(502, "Mini Course Generator said: " + String(r.json.error.message || "unknown error").slice(0, 300));
-  return { ok: true, result: r.json ? r.json.result : null };
+  const result = r.json ? r.json.result : null;
+  /* A tool can answer "ok" at the network level and still say the work failed. Keep its words. */
+  if (result && result.isError) {
+    const words = (Array.isArray(result.content) ? result.content : []).map((c) => (c && c.text) || "").join(" ").replace(/\s+/g, " ").slice(0, 400);
+    step("mcg_tool_refused", { said: words });
+  } else {
+    step("mcg_tool_ok", {});
+  }
+  return { ok: true, result };
 }
 
 /* ---------- YouTube: one empty playlist, nothing else ---------- */
@@ -438,6 +513,7 @@ async function youtubePlaylist(body) {
     throw new HttpError(502, plain("YouTube", r));
   }
   if (!r.json || !r.json.id) throw new HttpError(502, "YouTube answered, but not in the way we expected. Check your channel: the playlist may have been created.");
+  step("youtube_playlist_created", { playlistId: r.json.id, privacy });
   return { ok: true, playlistId: r.json.id, link: "https://www.youtube.com/playlist?list=" + r.json.id };
 }
 
@@ -468,12 +544,15 @@ async function aiGenerate(body, req) {
 
   const today = new Date().toISOString().slice(0, 10);
   if (aiDay.date !== today) { aiDay.date = today; aiDay.n = 0; }
+  if (aiDay.n >= AI_DAILY_LIMIT) step("ai_daily_limit_hit", { today: aiDay.n });
   if (aiDay.n >= AI_DAILY_LIMIT) throw new HttpError(429, "One-click generation has reached its limit for today. Use the Prompt Pack instead, it gives the same result.");
   const ip = clientIp(req), now = Date.now();
   const h = aiHits.get(ip) || { n: 0, t: now };
   if (now - h.t > 600000) { h.n = 0; h.t = now; }
+  if (h.n >= AI_PER_VISITOR) step("ai_visitor_limit_hit", { this_visitor_10min: h.n });
   if (h.n >= AI_PER_VISITOR) throw new HttpError(429, "You have generated a few outlines in a row. Wait ten minutes, or use the Prompt Pack.");
   h.n++; aiHits.set(ip, h); aiDay.n++;
+  step("ai_limits", { today: aiDay.n, daily_limit: AI_DAILY_LIMIT, this_visitor_10min: h.n });
   if (aiHits.size > 5000) aiHits.clear();
 
   /* Gemini models are sometimes overloaded or retired, so the next model in the list is tried before giving up.
@@ -488,7 +567,7 @@ async function aiGenerate(body, req) {
     order.splice(order.indexOf(aiWorking.model), 1);
     order.unshift(aiWorking.model);
   }
-  const t = trace.getStore();
+  step("ai_model_order", { order, resting: all.filter((m) => aiResting.get(m) > Date.now()), preferred: aiWorking.until > Date.now() ? aiWorking.model : "" });
   let outline = null, last = null;
   for (const model of order) {
     last = await call("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
@@ -499,11 +578,12 @@ async function aiGenerate(body, req) {
       const cand = last.json && last.json.candidates && last.json.candidates[0];
       const text = cand && cand.content && cand.content.parts ? cand.content.parts.map((x) => x.text || "").join("") : "";
       try { outline = Outline.normalize(Outline.extractJson(text)); }
-      catch (e) { outline = null; if (t) t.upstream.push(model + ":invalid-outline(" + String(e.message).slice(0, 40) + ")"); }
+      catch (e) { outline = null; step("ai_outline_rejected", { model, reason: String(e.message).slice(0, 160), answer_chars: text.length, finish: (cand && cand.finishReason) || "" }); }
       if (outline) {
         /* Remember a model that works, so the next visitors do not wait on one that is hanging. */
         aiWorking.model = model; aiWorking.until = Date.now() + 15 * 60000;
         aiResting.delete(model);
+        step("ai_outline_ok", Object.assign({ model }, Outline.counts(outline)));
         break;
       }
       if (aiWorking.model === model) aiWorking.until = 0;
@@ -511,6 +591,7 @@ async function aiGenerate(body, req) {
       break;
     } else {
       aiResting.set(model, Date.now() + 10 * 60000);
+      step("ai_model_rested", { model, status: last.status, minutes: 10 });
       if (aiWorking.model === model) aiWorking.until = 0;
     }
   }
@@ -519,6 +600,21 @@ async function aiGenerate(body, req) {
     throw new HttpError(503, "The AI is busy right now and could not finish your outline. Your answers are safe. Try again in a minute, or use the Prompt Pack below.");
   }
   return { ok: true, outline };
+}
+
+/* ---------- events reported by the visitor's page ----------
+ * The page tells us what it did and what went wrong on its side: things this server would never see
+ * otherwise (a blocked pop-up, a sign-in window closed, a page error, a request that never arrived).
+ */
+function clientLog(body, req, who) {
+  const events = Array.isArray(body && body.events) ? body.events.slice(0, 40) : [];
+  events.forEach((ev) => {
+    const text = str(ev && ev.text, 500);
+    if (!text) return;
+    const level = /page error|start failed|crash/i.test(text) ? "error" : (/failed|not accepted|blocked|stopped|closed before|could not|did not|too long|offline/i.test(text) ? "warn" : "info");
+    log(level, "page", text, { sid: who.sid, visitor: who.visitor, at: str(ev.at, 30), screen: str(ev.screen, 20) });
+  });
+  return { ok: true, taken: events.length };
 }
 
 /* ---------- routing ---------- */
@@ -542,20 +638,41 @@ const hits = new Map();
 function clientIp(req) {
   return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
 }
-function limited(req) {
-  const ip = clientIp(req);
+function limited(req, bucket, max) {
+  const key = (bucket || "api") + "|" + clientIp(req);
   const now = Date.now();
-  const h = hits.get(ip) || { n: 0, t: now };
+  const h = hits.get(key) || { n: 0, t: now };
   if (now - h.t > 60000) { h.n = 0; h.t = now; }
   h.n++;
-  hits.set(ip, h);
-  if (hits.size > 5000) hits.clear();
-  return h.n > 40;
+  hits.set(key, h);
+  if (hits.size > 8000) hits.clear();
+  return h.n > (max || 40);
 }
 
-function serveFile(res, file) {
+/* Who is asking, without keeping who they are: a short code that changes every day, and the page's own session code. */
+function whoIs(req) {
+  const day = new Date().toISOString().slice(0, 10);
+  let fromAddress = "";
+  try { fromAddress = new URL(req.url, "http://localhost").searchParams.get("s") || ""; } catch (e) { /* none */ }
+  const sid = String(req.headers["x-session"] || fromAddress).replace(/[^a-z0-9]/gi, "").slice(0, 16);
+  return {
+    visitor: crypto.createHash("sha256").update(day + "|" + clientIp(req)).digest("hex").slice(0, 8),
+    sid,
+    ua: String(req.headers["user-agent"] || "").slice(0, 140)
+  };
+}
+
+/* How serious was it. A wrong key is the visitor's to fix (warn). A service that did not answer, or our own bug, is an error. */
+function levelFor(status, upstream, bug) {
+  if (bug) return "error";
+  if (status < 400) return "info";
+  if (status >= 500 && (!upstream.length || upstream.some((u) => !u.status || u.status >= 500 || u.status === 429))) return "error";
+  return "warn";
+}
+
+function serveFile(res, file, p, who) {
   fs.readFile(file, (err, data) => {
-    if (err) { send(res, 404, "Not found"); return; }
+    if (err) { log("info", "not_found", "no such file: " + p, { visitor: who ? who.visitor : "" }); send(res, 404, "Not found"); return; }
     const ext = path.extname(file).toLowerCase();
     send(res, 200, data, {
       "Content-Type": MIME[ext] || "application/octet-stream",
@@ -572,7 +689,7 @@ function safeJoin(root, rel) {
 async function handle(req, res) {
   let p;
   try { p = decodeURIComponent(new URL(req.url, "http://localhost").pathname); }
-  catch (e) { send(res, 400, "Bad request"); return; }
+  catch (e) { log("warn", "bad_request", "an address that could not be read was requested", {}); send(res, 400, "Bad request"); return; }
 
   if (p === "/healthz") { send(res, 200, { ok: true }); return; }
 
@@ -581,14 +698,26 @@ async function handle(req, res) {
     return;
   }
 
+  const who = whoIs(req);
+
+  /* Events from the page. No start and end lines for these, each event is its own line. */
+  if (p === "/api/log") {
+    if (req.method !== "POST") { send(res, 405, { ok: false }); return; }
+    if (limited(req, "log", 90)) { send(res, 429, { ok: false }); return; }
+    try { send(res, 200, clientLog(await readJson(req), req, who)); }
+    catch (e) { send(res, 400, { ok: false }); }
+    return;
+  }
+
   if (p.indexOf("/api/") === 0) {
-    const store = { ref: crypto.randomBytes(3).toString("hex"), upstream: [] };
-    const t0 = Date.now();
-    let status = 200, out, note = "";
+    const store = { ref: crypto.randomBytes(3).toString("hex"), upstream: [], steps: [], t0: Date.now() };
+    const base = { ref: store.ref, path: p, sid: who.sid, visitor: who.visitor };
+    let status = 200, out, bug = null;
     const handler = API[p];
+    log("info", "api_start", "start " + p + " ref " + store.ref, Object.assign({ method: req.method, bytes: parseInt(req.headers["content-length"], 10) || 0, ua: who.ua }, base));
     if (!handler) { status = 404; out = { ok: false, error: "Unknown endpoint." }; }
     else if (req.method !== "POST") { status = 405; out = { ok: false, error: "Use POST." }; }
-    else if (limited(req)) { status = 429; out = { ok: false, error: "Too many requests in a short time. Wait a minute and try again." }; }
+    else if (limited(req)) { status = 429; out = { ok: false, error: "Too many requests in a short time. Wait a minute and try again." }; step("rate_limited", {}); }
     else {
       try {
         const body = await readJson(req);
@@ -596,24 +725,27 @@ async function handle(req, res) {
       } catch (e) {
         if (e instanceof HttpError) { status = e.status; out = Object.assign({ ok: false, error: e.message }, e.extra); }
         else {
-          status = 500;
+          status = 500; bug = e;
           out = { ok: false, error: "Something went wrong on our side. Nothing was lost on your page. Try again in a minute." };
-          note = " bug=" + (e && e.stack ? e.stack.split("\n").slice(0, 2).join(" | ") : String(e));
         }
       }
     }
     out.ref = store.ref;
-    /* One line per API request: ref, path, status, time, and which outside service said what. Never any content. */
-    console.log("api ref=" + store.ref + " " + p + " " + status + " " + (Date.now() - t0) + "ms" + (store.upstream.length ? " upstream=" + store.upstream.join(",") : "") + note);
+    const ms = Date.now() - store.t0;
+    const level = levelFor(status, store.upstream, bug);
+    /* The whole story of one request in one line: what was asked, every outside call, every step, what the visitor was told. */
+    log(level, "api_end",
+      (status < 400 ? "ok " : "failed ") + p + " " + status + " in " + ms + "ms ref " + store.ref + (out.error ? ": " + out.error : ""),
+      Object.assign({ status, ms, upstream: store.upstream, steps: store.steps, shown: out.error || "", bug: bug ? stackOf(bug) : undefined }, base));
     send(res, status, out);
     return;
   }
 
-  if (req.method !== "GET" && req.method !== "HEAD") { send(res, 405, "Method not allowed"); return; }
+  if (req.method !== "GET" && req.method !== "HEAD") { log("warn", "bad_method", req.method + " " + p, { visitor: who.visitor }); send(res, 405, "Method not allowed"); return; }
 
   if (p.indexOf("/schema/") === 0) {
     const f = safeJoin(SCHEMA_DIR, p.slice("/schema/".length));
-    if (f) serveFile(res, f); else send(res, 404, "Not found");
+    if (f) serveFile(res, f, p, who); else send(res, 404, "Not found");
     return;
   }
 
@@ -621,14 +753,20 @@ async function handle(req, res) {
   if (rel === "mcg-callback") rel = "mcg-callback.html";
   /* Sign-in return addresses. GoHighLevel does not allow its own name in a return address, hence "crm". */
   if (rel === "connect/whop/callback" || rel === "connect/crm/callback") rel = "oauth-callback.html";
+  if (rel === "index.html") log("info", "page_view", "page opened", { visitor: who.visitor, ua: who.ua, from: String(req.headers.referer || "").slice(0, 120) });
+  if (rel.indexOf("callback") >= 0) {
+    /* A sign-in came back. Only whether it carried a code or an error is noted, never the code itself. */
+    const q = new URL(req.url, "http://localhost").searchParams;
+    log(q.get("error") ? "warn" : "info", "signin_return", "sign-in returned to " + p, { visitor: who.visitor, has_code: !!q.get("code"), error: str(q.get("error_description") || q.get("error") || "", 200) });
+  }
   const file = safeJoin(PUBLIC_DIR, rel);
-  if (!file) { send(res, 404, "Not found"); return; }
-  serveFile(res, file);
+  if (!file) { log("warn", "not_found", "outside the public folder: " + p, { visitor: who.visitor }); send(res, 404, "Not found"); return; }
+  serveFile(res, file, p, who);
 }
 
 const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => {
-    console.log("request failed " + (e && e.stack ? e.stack.split("\n").slice(0, 2).join(" | ") : e));
+    log("error", "crash", "a request failed outside the normal path: " + (e && e.message), { url_path: String(req.url || "").split("?")[0].slice(0, 120), stack: stackOf(e) });
     try { if (!res.headersSent) send(res, 500, { ok: false, error: "Something went wrong on our side. Try again in a minute." }); else res.end(); } catch (x) { /* socket gone */ }
   });
 });
@@ -636,4 +774,22 @@ server.on("clientError", (err, socket) => { try { socket.end("HTTP/1.1 400 Bad R
 /* Long pushes and generation need more than the default time. */
 server.requestTimeout = 240000;
 
-server.listen(PORT, () => { console.log("minicourse-as-a-lead-magnet listening on " + PORT); });
+server.listen(PORT, () => {
+  log("info", "server_start", "server started on port " + PORT, {
+    node: process.version,
+    features: {
+      one_click_ai: !!GEMINI_API_KEY, youtube: !!GOOGLE_CLIENT_ID,
+      connect_whop: !!WHOP_CLIENT_ID, whop_app_type: WHOP_CLIENT_SECRET ? "confidential" : "public", connect_ghl: !!(GHL_CLIENT_ID && GHL_CLIENT_SECRET)
+    },
+    ai: { model: GEMINI_MODEL, fallbacks: GEMINI_FALLBACK_MODELS, daily_limit: AI_DAILY_LIMIT, per_visitor_10min: AI_PER_VISITOR }
+  });
+});
+
+/* A redeploy stops the old server. Say so, so a gap in the log has an explanation. */
+["SIGTERM", "SIGINT"].forEach((sig) => {
+  process.on(sig, () => {
+    log("info", "server_stop", "server stopping (" + sig + "), usually a redeploy", { uptime_s: Math.round(process.uptime()) });
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 8000).unref();
+  });
+});

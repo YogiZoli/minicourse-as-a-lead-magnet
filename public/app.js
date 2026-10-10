@@ -21,6 +21,7 @@
   function esc(t){ return String(t == null ? "" : t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function show(id, focusId){
     SCREENS.forEach(function(s){ $(s).hidden = s !== id; });
+    if(S.screen !== id) logEvent("screen: " + id);
     S.screen = id; save();
     window.scrollTo(0, 0);
     if(focusId && $(focusId)) $(focusId).focus({ preventScroll:true });
@@ -33,6 +34,7 @@
     a.href = URL.createObjectURL(blob); a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    logEvent("download: " + filename + " (" + blob.size + " bytes)");
   }
   function copyText(text, btn){
     function done(){
@@ -51,15 +53,51 @@
     try{ document.execCommand("copy"); }catch(e){}
     t.remove();
   }
-  /* ---------- activity log: what this page did and when, so a problem can be traced ---------- */
+  /* ---------- activity log: what this page did and when, so a problem can be traced ----------
+   * Every event is kept in this tab (the visitor can copy it) and is also reported to our server log,
+   * tagged with this tab's session code. Only what happened is reported: never answers, the outline,
+   * a name, an email or a key. Anything that looks like a key is masked before it leaves the page.
+   */
+  var SID = "";
+  try{ SID = sessionStorage.getItem("mc_sid") || ""; }catch(e){}
+  if(!SID){
+    SID = Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+    try{ sessionStorage.setItem("mc_sid", SID); }catch(e){}
+  }
   var LOG = [];
   try{ LOG = JSON.parse(sessionStorage.getItem("mc_log") || "[]") || []; }catch(e){ LOG = []; }
-  function logEvent(text){
-    LOG.push(new Date().toISOString().slice(11, 19) + " UTC  " + String(text).slice(0, 320));
-    if(LOG.length > 200) LOG = LOG.slice(-200);
-    try{ sessionStorage.setItem("mc_log", JSON.stringify(LOG)); }catch(e){}
-    var box = $("logText"); if(box) box.textContent = LOG.join("\n");
+  var outbox = [], outboxTimer = null;
+  function hideKeys(t){
+    return String(t).replace(/Bearer\s+\S+/gi, "Bearer [hidden]")
+      .replace(/\b(apik_|pit-|sk-ant-|sk-|AIza|AQ\.|ya29\.|GOCSPX-|eyJ)[A-Za-z0-9._\-]{6,}/g, "$1[hidden]")
+      .replace(/[A-Za-z0-9_\-]{44,}/g, "[hidden]");
   }
+  function sendOutbox(leaving){
+    clearTimeout(outboxTimer); outboxTimer = null;
+    if(!outbox.length) return;
+    var body = JSON.stringify({ events:outbox.splice(0, 40) });
+    try{
+      if(leaving && navigator.sendBeacon){
+        navigator.sendBeacon("/api/log?s=" + SID, new Blob([body], { type:"application/json" }));
+      } else {
+        fetch("/api/log", { method:"POST", headers:{ "Content-Type":"application/json", "X-Session":SID }, body:body, keepalive:true }).catch(function(){});
+      }
+    }catch(e){}
+  }
+  function logEvent(text){
+    var at = new Date().toISOString();
+    text = hideKeys(text).slice(0, 480);
+    LOG.push(at.slice(11, 19) + " UTC  " + text);
+    if(LOG.length > 300) LOG = LOG.slice(-300);
+    try{ sessionStorage.setItem("mc_log", JSON.stringify(LOG)); }catch(e){}
+    var box = $("logText"); if(box) box.textContent = "Session " + SID + "\n" + LOG.join("\n");
+    outbox.push({ at:at, text:text, screen:S.screen });
+    if(outbox.length >= 20) sendOutbox(false);
+    else if(!outboxTimer) outboxTimer = setTimeout(function(){ sendOutbox(false); }, 2500);
+  }
+  window.addEventListener("pagehide", function(){ logEvent("page closed or hidden" + (running > 0 ? " WHILE WORK WAS RUNNING" : "")); sendOutbox(true); });
+  window.addEventListener("offline", function(){ logEvent("browser went offline"); });
+  window.addEventListener("online", function(){ logEvent("browser back online"); });
 
   /* ---------- running work: a live status line with seconds, and a warning before the tab is closed ---------- */
   var running = 0;
@@ -79,12 +117,16 @@
 
   /* ---------- one call to our own server. Always resolves, never hangs, never shows a raw error. ---------- */
   function api(path, body, timeoutMs, slowMsg){
-    var ctl = new AbortController(), timedOut = false;
-    var timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, timeoutMs || 60000);
-    return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body), signal:ctl.signal })
+    var ctl = new AbortController(), timedOut = false, t0 = Date.now(), limit = timeoutMs || 60000;
+    var timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, limit);
+    return fetch(path, { method:"POST", headers:{ "Content-Type":"application/json", "X-Session":SID }, body:JSON.stringify(body), signal:ctl.signal })
       .then(function(r){
-        return r.json().catch(function(){ return { ok:false, error:"The server sent an answer we could not read (" + r.status + "). Try again in a minute." }; });
-      }, function(){
+        return r.json().catch(function(){
+          logEvent(path + " answered " + r.status + " with something that is not JSON");
+          return { ok:false, error:"The server sent an answer we could not read (" + r.status + "). Try again in a minute." };
+        });
+      }, function(e){
+        logEvent(path + (timedOut ? " gave no answer within " + Math.round(limit / 1000) + " s, we stopped waiting" : " could not be reached: " + ((e && e.message) || "network error")) + (navigator.onLine === false ? " (browser is offline)" : ""));
         return { ok:false, error: timedOut
           ? (slowMsg || "This is taking longer than it should, so we stopped waiting. It may still have gone through: check there before you try again.")
           : "Could not reach the server. Check your internet connection and try again." };
@@ -93,7 +135,7 @@
         if(!r || typeof r !== "object") r = { ok:false, error:"The server sent an empty answer. Try again." };
         if(!r.ok && !r.error) r.error = "Something went wrong. Try again.";
         if(!r.ok && r.ref) r.error += " (ref " + r.ref + ")";
-        logEvent(path + (r.ok ? " ok" + (r.ref ? " (ref " + r.ref + ")" : "") : " failed: " + r.error));
+        logEvent(path + (r.ok ? " ok" : " failed: " + r.error) + " in " + (Date.now() - t0) + " ms" + (r.ok && r.ref ? " (ref " + r.ref + ")" : ""));
         return r;
       });
   }
@@ -101,14 +143,25 @@
   /* ---------- anything unexpected: a calm notice instead of a broken page ---------- */
   function crash(what){
     logEvent("page error: " + what);
+    sendOutbox(false);
     var c = $("crash"); if(c) c.hidden = false;
   }
   window.addEventListener("error", function(ev){
-    if(ev && ev.filename && ev.filename.indexOf(location.origin) === 0) crash((ev.message || "script error") + " at " + ev.filename.replace(location.origin, "") + ":" + ev.lineno);
+    if(ev && ev.filename && ev.filename.indexOf(location.origin) === 0){
+      crash((ev.message || "script error") + " at " + ev.filename.replace(location.origin, "") + ":" + ev.lineno + ":" + ev.colno);
+    } else if(ev && ev.message){
+      logEvent("error in a script that is not ours: " + ev.message + " (" + String(ev.filename || "unknown").slice(0, 80) + ")");
+    }
   });
   window.addEventListener("unhandledrejection", function(ev){
-    crash(ev && ev.reason && ev.reason.message ? ev.reason.message : String(ev && ev.reason));
+    var r = ev && ev.reason;
+    crash((r && r.message ? r.message : String(r)) + (r && r.stack ? " | " + String(r.stack).split("\n").slice(1, 4).join(" | ").replace(new RegExp(location.origin, "g"), "") : ""));
   });
+  /* A file the page needs that did not load (script, style, font). */
+  window.addEventListener("error", function(ev){
+    var t = ev && ev.target;
+    if(t && t !== window && (t.src || t.href)) logEvent("a file did not load: " + String(t.src || t.href).slice(0, 160));
+  }, true);
 
   /* ================= questions ================= */
 
@@ -158,7 +211,8 @@
   $("qForm").addEventListener("submit", function(ev){
     ev.preventDefault();
     var problem = readQuestion();
-    if(problem){ setErr($("qErr"), problem); return; }
+    if(problem){ setErr($("qErr"), problem); logEvent("question " + (S.i + 1) + " (" + QUESTIONS[S.i].id + ") not accepted: " + problem); return; }
+    logEvent("question " + (S.i + 1) + " of " + QUESTIONS.length + " (" + QUESTIONS[S.i].id + ") answered");
     if(S.i < QUESTIONS.length - 1){ S.i++; save(); renderQuestion(); $("qTitle").focus(); window.scrollTo(0, 0); }
     else if(S.lead){ openGen(); }
     else { show("sGate", "gateTitle"); }
@@ -174,21 +228,26 @@
   /* ================= email gate ================= */
 
   function sendLead(payload){
-    if(!WEBHOOK_URL) return;
+    if(!WEBHOOK_URL){ logEvent("lead webhook: not set, nothing sent"); return; }
     try{
       fetch(WEBHOOK_URL, {
         method:"POST", headers:{ "Content-Type":"application/json" },
         body:JSON.stringify(payload), keepalive:true
-      }).catch(function(){
+      }).then(function(r){
+        logEvent("lead webhook: answered " + r.status);
+      }, function(){
         /* If the browser blocks the JSON request (CORS), resend as a plain form post. */
         var flat = new URLSearchParams();
         flat.append("name", payload.name);
         flat.append("email", payload.email);
         flat.append("source", payload.source);
         Object.keys(payload.answers).forEach(function(k){ flat.append(k, String(payload.answers[k])); });
-        return fetch(WEBHOOK_URL, { method:"POST", mode:"no-cors", body:flat, keepalive:true });
-      }).catch(function(){});
-    }catch(e){}
+        logEvent("lead webhook: first try blocked, sent again as a form post");
+        return fetch(WEBHOOK_URL, { method:"POST", mode:"no-cors", body:flat, keepalive:true }).then(function(){
+          logEvent("lead webhook: form post sent (the browser does not show its answer)");
+        });
+      }).catch(function(e){ logEvent("lead webhook failed: " + ((e && e.message) || "network error")); });
+    }catch(e){ logEvent("lead webhook failed: " + ((e && e.message) || "error")); }
   }
 
   $("gateForm").addEventListener("submit", function(ev){
@@ -196,7 +255,8 @@
     var name = $("leadName").value.trim(), email = $("leadEmail").value.trim(), problem = "";
     if(!name) problem = "Enter your first name.";
     else if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) problem = "Enter a valid email address, like name@example.com.";
-    if(problem){ setErr($("gateErr"), problem); (name ? $("leadEmail") : $("leadName")).focus(); return; }
+    if(problem){ setErr($("gateErr"), problem); (name ? $("leadEmail") : $("leadName")).focus(); logEvent("gate not accepted: " + problem); return; }
+    logEvent("gate passed");
     setErr($("gateErr"), "");
     S.lead = { name:name, email:email };
     sendLead({ name:name, email:email, source:SOURCE, answers:S.answers });
@@ -216,11 +276,12 @@
     $("tabPack").setAttribute("aria-selected", key ? "false" : "true");
     $("tabKey").setAttribute("aria-selected", key ? "true" : "false");
     $("panePack").hidden = key; $("paneKey").hidden = !key;
+    logEvent("generation tab: " + (key ? "own AI key" : "prompt pack"));
   }
   $("tabPack").addEventListener("click", function(){ pickTab(false); });
   $("tabKey").addEventListener("click", function(){ pickTab(true); });
   $("genBack").addEventListener("click", function(){ S.i = 0; renderQuestion(); show("sQuiz", "qTitle"); });
-  $("copyPrompt").addEventListener("click", function(){ copyText($("promptOut").value, this); });
+  $("copyPrompt").addEventListener("click", function(){ copyText($("promptOut").value, this); logEvent("prompt copied (" + $("promptOut").value.length + " characters)"); });
 
   function showOutline(o){
     var k = Outline.counts(o);
@@ -232,7 +293,8 @@
   function acceptOutline(text){ showOutline(Outline.normalize(Outline.extractJson(text))); }
   $("usePaste").addEventListener("click", function(){
     var t = $("pasteIn").value.trim();
-    if(!t){ setErr($("pasteErr"), "Paste the answer from your AI app first."); $("pasteIn").focus(); return; }
+    if(!t){ setErr($("pasteErr"), "Paste the answer from your AI app first."); $("pasteIn").focus(); logEvent("paste: box was empty"); return; }
+    logEvent("paste: " + t.length + " characters pasted");
     try{ setErr($("pasteErr"), ""); acceptOutline(t); }
     catch(e){ setErr($("pasteErr"), e.message); logEvent("pasted answer not accepted: " + e.message); }
   });
@@ -682,19 +744,20 @@
    */
   var stopWaiting = null;
   function signInWindow(popup, url, state, who, lenientState){
-    if(!popup) return Promise.reject(new Error("Your browser blocked the sign-in window. Allow pop-ups for this page and try again."));
+    if(!popup){ logEvent(who + " sign-in window was blocked by the browser"); return Promise.reject(new Error("Your browser blocked the sign-in window. Allow pop-ups for this page and try again.")); }
     try{ localStorage.removeItem("mc_oauth_cb"); }catch(e){}
     var t0 = Date.now();
     popup.location.href = url;
+    logEvent(who + " sign-in window opened");
     return new Promise(function(resolve, reject){
-      var closedAt = 0, finished = false;
+      var closedAt = 0, finished = false, cutNoted = false;
       var timer = setInterval(function(){
         readStored();
         if(finished) return;
         if(Date.now() - t0 > 600000) return end(new Error("The " + who + " sign-in was not finished within 10 minutes. Try again."));
         var closed = false; try{ closed = popup.closed; }catch(e){ closed = false; }
         if(!closed){ closedAt = 0; return; }
-        if(Date.now() - t0 < 4000) return;              /* too early to be the visitor: the link was cut, keep waiting */
+        if(Date.now() - t0 < 4000){ if(!cutNoted){ cutNoted = true; logEvent(who + " sign-in: the window link was cut by the sign-in page, waiting for the answer the other way"); } return; }
         if(!closedAt){ closedAt = Date.now(); return; }
         if(Date.now() - closedAt > 2500) end(new Error("The " + who + " sign-in window was closed before it finished. Try again."));
       }, 500);
@@ -704,6 +767,7 @@
         stopWaiting = null;
         try{ localStorage.removeItem("mc_oauth_cb"); }catch(e){}
         try{ popup.close(); }catch(e){}
+        logEvent(who + " sign-in ended after " + Math.round((Date.now() - t0) / 1000) + " s: " + (err ? err.message : "code received"));
         if(err) reject(err); else resolve(code);
       }
       function take(d){
@@ -836,7 +900,8 @@
     googleReady = new Promise(function(resolve, reject){
       var s = document.createElement("script");
       s.src = "https://accounts.google.com/gsi/client"; s.async = true;
-      s.onload = resolve; s.onerror = function(){ googleReady = null; reject(new Error("Google sign-in did not load. Check your connection and try again.")); };
+      s.onload = function(){ logEvent("google sign-in script loaded"); resolve(); };
+      s.onerror = function(){ googleReady = null; logEvent("google sign-in script did not load"); reject(new Error("Google sign-in did not load. Check your connection and try again.")); };
       document.head.appendChild(s);
     });
     return googleReady;
@@ -848,15 +913,18 @@
           client_id:ENV.GOOGLE_CLIENT_ID,
           scope:"https://www.googleapis.com/auth/youtube.force-ssl",
           callback:function(resp){
+            logEvent("google answered: " + (resp && resp.access_token ? "permission given" : "no permission, " + ((resp && resp.error) || "no reason given")));
             if(resp && resp.access_token) resolve(resp.access_token);
             else if(resp && resp.error === "access_denied") reject(new Error("YouTube connect is in testing, so only approved test accounts can use it for now. Use the playlist plan above and create the playlist by hand."));
             else reject(new Error("Google did not give permission. Try again and allow the YouTube access."));
           },
           error_callback:function(err){
+            logEvent("google window problem: " + ((err && err.type) || "unknown"));
             if(err && err.type === "popup_failed_to_open") reject(new Error("Your browser blocked the Google window. Allow pop-ups for this page and try again."));
             else reject(new Error("The Google window was closed before it finished. If Google showed an access blocked message, this tool is in testing and only approved test accounts can connect for now."));
           }
         });
+        logEvent("google window asked for");
         client.requestAccessToken();
       });
     });
@@ -865,8 +933,8 @@
   /* ================= start ================= */
 
   $("crashReload").addEventListener("click", function(){ location.reload(); });
-  $("logCopy").addEventListener("click", function(){ copyText(LOG.join("\n"), this); });
-  $("logText").textContent = LOG.join("\n");
+  $("logCopy").addEventListener("click", function(){ copyText("Session " + SID + "\n" + LOG.join("\n"), this); });
+  $("logText").textContent = "Session " + SID + "\n" + LOG.join("\n");
 
   /* If saved work cannot be shown for any reason, the page still opens: on the questions, with the answers kept. */
   try{
@@ -881,7 +949,8 @@
     else if(S.screen === "sGate"){ show("sGate"); }
     else if(S.screen === "sQuiz"){ renderQuestion(); show("sQuiz"); }
     else { show("sIntro"); }
-    logEvent("page opened on " + S.screen);
+    logEvent("page opened on " + S.screen + " | " + window.innerWidth + "x" + window.innerHeight + " | " + (navigator.language || "") + " | " + navigator.userAgent.slice(0, 120) +
+      " | features: ai " + !!ENV.AI_HOSTED + ", youtube " + !!ENV.GOOGLE_CLIENT_ID + ", whop connect " + !!ENV.WHOP_CLIENT_ID + ", ghl connect " + !!ENV.GHL_CLIENT_ID + ", pdf tool " + !!(window.jspdf && window.jspdf.jsPDF));
   }catch(e){
     logEvent("start failed: " + (e && e.message));
     S.outline = null; S.screen = "sIntro"; save();
