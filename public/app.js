@@ -320,6 +320,14 @@
     else if(d.skBody != null) copyText(Outline.lessonContentMd(at(d.skBody)), b);
   });
 
+  /* The jump buttons under the summary open the matching platform panel and scroll to it. */
+  $("jumpRow").addEventListener("click", function(ev){
+    var b = ev.target.closest("button[data-jump]"); if(!b) return;
+    var d = $(b.dataset.jump);
+    d.open = true;
+    d.scrollIntoView({ behavior:"smooth", block:"start" });
+  });
+
   $("dlPdf").addEventListener("click", function(){
     var msg = $("pdfMsg");
     if(!window.jspdf || !window.jspdf.jsPDF){ msg.textContent = "The PDF tool did not load. Check your connection, reload the page and try again."; return; }
