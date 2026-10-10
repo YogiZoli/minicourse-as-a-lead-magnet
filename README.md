@@ -70,7 +70,7 @@ node scripts/logs.mjs find whop
 node scripts/logs.mjs full ref 2aa496
 ```
 
-Add a number at the end to look further back, for example `node scripts/logs.mjs errors 5000`.
+Railway keeps a separate log for every deployment, and every code change is a new deployment. The reader goes through the last 12 deployments and puts them in time order. To go further back add `deploys=40`, for example `node scripts/logs.mjs errors deploys=40`.
 
 **Where the two codes come from:**
 
@@ -84,7 +84,7 @@ Add a number at the end to look further back, for example `node scripts/logs.mjs
 | `server_start`, `server_stop` | start and redeploy | which features are on, the AI model order, uptime |
 | `page_view` | the page is opened | browser, where the visitor came from |
 | `api_start` | a request arrives | ref, path, size, session, visitor |
-| `api_end` | a request is answered | status, duration, every outside call (`upstream`), every step (`steps`), the message the visitor was shown (`shown`), a stack if it was our bug (`bug`) |
+| `api_end` | a request is answered (with `visitor_gone` if the page had already left) | status, duration, every outside call (`upstream`), every step (`steps`), the message the visitor was shown (`shown`), a stack if it was our bug (`bug`) |
 | `page` | the visitor's page reports something | screen changes, each question answered (not the answer), sign-in windows opening and closing, pushes started and failed, downloads, files that did not load, page errors, going offline, the tab being closed while work was running |
 | `signin_return` | a sign-in window comes back | whether it carried a code or an error, never the code |
 | `not_found`, `bad_method`, `bad_request` | odd requests | the path |

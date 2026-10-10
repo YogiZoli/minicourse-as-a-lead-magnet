@@ -121,7 +121,9 @@ function readJson(req) {
       try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}")); }
       catch (e) { reject(new HttpError(400, "The request was not valid JSON.")); }
     });
-    req.on("error", reject);
+    req.on("error", () => reject(new HttpError(499, "The request was cut off before it arrived.")));
+    /* The visitor's connection dropped before the whole request arrived. */
+    req.on("close", () => { if (!req.complete) reject(new HttpError(499, "The request was cut off before it arrived.")); });
   });
 }
 
@@ -712,7 +714,8 @@ async function handle(req, res) {
   if (p.indexOf("/api/") === 0) {
     const store = { ref: crypto.randomBytes(3).toString("hex"), upstream: [], steps: [], t0: Date.now() };
     const base = { ref: store.ref, path: p, sid: who.sid, visitor: who.visitor };
-    let status = 200, out, bug = null;
+    let status = 200, out, bug = null, gone = false;
+    res.on("close", () => { if (!res.writableEnded) gone = true; });
     const handler = API[p];
     log("info", "api_start", "start " + p + " ref " + store.ref, Object.assign({ method: req.method, bytes: parseInt(req.headers["content-length"], 10) || 0, ua: who.ua }, base));
     if (!handler) { status = 404; out = { ok: false, error: "Unknown endpoint." }; }
@@ -730,13 +733,19 @@ async function handle(req, res) {
         }
       }
     }
+    if (!out || typeof out !== "object") {
+      status = 500; bug = bug || new Error("a handler gave no answer");
+      out = { ok: false, error: "Something went wrong on our side. Nothing was lost on your page. Try again in a minute." };
+    }
     out.ref = store.ref;
     const ms = Date.now() - store.t0;
     const level = levelFor(status, store.upstream, bug);
     /* The whole story of one request in one line: what was asked, every outside call, every step, what the visitor was told. */
     log(level, "api_end",
       (status < 400 ? "ok " : "failed ") + p + " " + status + " in " + ms + "ms ref " + store.ref + (out.error ? ": " + out.error : ""),
-      Object.assign({ status, ms, upstream: store.upstream, steps: store.steps, shown: out.error || "", bug: bug ? stackOf(bug) : undefined }, base));
+      Object.assign({ status, ms, upstream: store.upstream, steps: store.steps, shown: out.error || "", bug: bug ? stackOf(bug) : undefined,
+        /* The work was finished, but the visitor's page was no longer there to hear about it. */
+        visitor_gone: gone || undefined }, base));
     send(res, status, out);
     return;
   }
@@ -785,11 +794,14 @@ server.listen(PORT, () => {
   });
 });
 
-/* A redeploy stops the old server. Say so, so a gap in the log has an explanation. */
+/* A redeploy stops the old server. Say so, so a gap in the log has an explanation, and let running requests finish. */
+let open = 0;
+server.on("request", (req, res) => { open++; res.on("close", () => { open--; }); });
 ["SIGTERM", "SIGINT"].forEach((sig) => {
   process.on(sig, () => {
-    log("info", "server_stop", "server stopping (" + sig + "), usually a redeploy", { uptime_s: Math.round(process.uptime()) });
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 8000).unref();
+    log("info", "server_stop", "server stopping (" + sig + "), usually a redeploy. Requests still running: " + open, { uptime_s: Math.round(process.uptime()), running: open });
+    /* No new requests. The ones already running get up to 25 seconds to finish. */
+    server.close(() => { log("info", "server_stop", "server stopped cleanly", {}); process.exit(0); });
+    setTimeout(() => { log("warn", "server_stop", "server stopped with " + open + " request(s) still running", { running: open }); process.exit(0); }, 25000).unref();
   });
 });

@@ -573,6 +573,10 @@
       },
       confirm:function(){
         return api("/api/whop/push", { apiKey:conn.whop.use, experienceId:$("whopExp").value, course:Outline.pushCourse(S.outline) }, 200000).then(function(r){
+          if(!r.ok && conn.whop.token && conn.whop.use === conn.whop.token && /did not accept|expired/i.test(r.error) && !(r.created && r.created.courseId)){
+            conn.whop.token = ""; r.reconnect = true;
+            r.error = "Your Whop sign-in has run out. Click Connect Whop to sign in again. Nothing was created." + (r.ref ? " (ref " + r.ref + ")" : "");
+          }
           if(!r.ok && r.created && r.created.courseId) r.error += " Whop already has part of it: 1 course, " + r.created.chapters + " chapters and " + r.created.lessons + " lessons. Delete that course in Whop before you try again, or you will get a second one.";
           return r;
         });
@@ -610,7 +614,10 @@
       },
       confirm:function(){
         return api("/api/ghl/push", { token:conn.ghl.use.token, locationId:conn.ghl.use.locationId, course:Outline.pushCourse(S.outline) }).then(function(r){
-          if(!r.ok && /did not accept/.test(r.error)) conn.ghl.token = "";
+          if(!r.ok && conn.ghl.token && conn.ghl.use.token === conn.ghl.token && /did not accept|expired/i.test(r.error)){
+            conn.ghl.token = ""; r.reconnect = true;
+            r.error = "Your GoHighLevel sign-in has run out. Click Connect GoHighLevel to sign in again. Nothing was created." + (r.ref ? " (ref " + r.ref + ")" : "");
+          }
           return r;
         });
       },
@@ -675,13 +682,14 @@
       '<div class="preview" hidden></div>' +
       '<div class="actions" data-r="confirm" hidden><button class="btn big" type="button" data-a="confirm">Confirm and create</button><button class="btn ghost" type="button" data-a="cancel">Cancel</button></div>' +
       '<p class="status" role="status" hidden></p>' +
+      '<p class="hint" data-r="note" hidden></p>' +
       '<div class="actions" data-r="stop" hidden><button class="btn ghost" type="button" data-a="stop">Stop waiting</button></div>' +
       '<div class="okmsg" role="status" hidden></div>' +
       '<div class="actions" data-r="again" hidden><button class="btn ghost" type="button" data-a="again">Create it again</button></div>';
     var ui = {
       err:host.querySelector(".formerr"), preview:host.querySelector(".preview"), ok:host.querySelector(".okmsg"), status:host.querySelector(".status"),
       start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]'), stop:host.querySelector('[data-r="stop"]'),
-      again:host.querySelector('[data-r="again"]')
+      again:host.querySelector('[data-r="again"]'), note:host.querySelector('[data-r="note"]')
     };
     /* Once signed in, the button no longer says Connect. */
     function relabel(){ ui.start.querySelector("button").textContent = def.label ? def.label() : def.previewLabel; }
@@ -692,6 +700,8 @@
       Array.prototype.forEach.call(host.querySelectorAll("button"), function(b){ if(b.dataset.a !== "stop") b.disabled = on; });
       /* While a sign-in window is open the visitor can stop the wait. */
       ui.stop.hidden = !(on && def.signIn);
+      ui.note.hidden = true; ui.note.textContent = "";
+      signInNote = on && def.signIn ? function(t){ ui.note.textContent = t; ui.note.hidden = false; } : null;
     }
     function fail(e){
       setErr(ui.err, (e && e.message) || "Something went wrong. Try again.");
@@ -723,6 +733,7 @@
         stop = startWork(ui.status, def.confirmWait || "Creating. Keep this tab open.");
         logEvent(name + ": create started");
         run(function(){ return def.confirm(); }).then(function(r){
+          if(r && !r.ok && r.reconnect) reset();
           if(!r || !r.ok) throw new Error((r && r.error) || "Something went wrong. Try again.");
           reset();
           /* The result takes the place of the start button, so a finished push cannot be mistaken for one that has not run. */
@@ -758,6 +769,7 @@
    * the first seconds is not trusted as closed. The visitor can always stop the wait with "Stop waiting".
    */
   var stopWaiting = null;
+  var signInNote = null;   /* set by the panel that is waiting, to show a hint under its status line */
   function signInWindow(popup, url, state, who, lenientState){
     if(!popup){ logEvent(who + " sign-in window was blocked by the browser"); return Promise.reject(new Error("Your browser blocked the sign-in window. Allow pop-ups for this page and try again.")); }
     try{ localStorage.removeItem("mc_oauth_cb"); }catch(e){}
@@ -765,16 +777,20 @@
     popup.location.href = url;
     logEvent(who + " sign-in window opened");
     return new Promise(function(resolve, reject){
-      var closedAt = 0, finished = false, cutNoted = false;
+      var finished = false, looksClosedNoted = false;
       var timer = setInterval(function(){
         readStored();
         if(finished) return;
         if(Date.now() - t0 > 600000) return end(new Error("The " + who + " sign-in was not finished within 10 minutes. Try again."));
+        /* Some sign-in pages cut the link between the two windows, and then the window looks closed while the
+           visitor is still signing in. So "looks closed" never ends the wait. It only changes the hint, and the
+           visitor decides with Stop waiting. The answer still arrives through localStorage. */
         var closed = false; try{ closed = popup.closed; }catch(e){ closed = false; }
-        if(!closed){ closedAt = 0; return; }
-        if(Date.now() - t0 < 4000){ if(!cutNoted){ cutNoted = true; logEvent(who + " sign-in: the window link was cut by the sign-in page, waiting for the answer the other way"); } return; }
-        if(!closedAt){ closedAt = Date.now(); return; }
-        if(Date.now() - closedAt > 2500) end(new Error("The " + who + " sign-in window was closed before it finished. Try again."));
+        if(closed && !looksClosedNoted && Date.now() - t0 > 1500){
+          looksClosedNoted = true;
+          logEvent(who + " sign-in: the window looks closed after " + Math.round((Date.now() - t0) / 1000) + " s, still waiting for the answer");
+          if(signInNote) signInNote("Still waiting for " + who + ". If you closed the small window, click Stop waiting and try again. If it is still open, finish signing in there.");
+        }
       }, 500);
       function end(err, code){
         if(finished) return; finished = true;
@@ -866,7 +882,10 @@
   function mcgTool(name, args){
     return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:name, arguments:args } }, 150000).then(function(r){
       if(!r.ok){
-        if(/sign-in has expired|did not accept/.test(r.error || "")) mcg.token = "";
+        if(/sign-in has expired|did not accept/.test(r.error || "")){
+          mcg.token = "";
+          throw new Error("Your Mini Course Generator sign-in has run out. Click Connect Mini Course Generator to sign in again." + (r.ref ? " (ref " + r.ref + ")" : ""));
+        }
         throw new Error(r.error);
       }
       var res = r.result || {};
