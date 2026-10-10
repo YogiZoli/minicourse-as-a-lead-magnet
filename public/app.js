@@ -406,13 +406,15 @@
       preview:function(ui){
         var popup = mcg.token ? null : window.open("about:blank", "mcg_oauth", "width=520,height=720");
         var p = mcg.token ? Promise.resolve() : mcgConnect(popup);
-        return p.then(function(){ return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/list" }); }).then(function(r){
+        return p.then(function(){
+          return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:"get_content_format", arguments:{} } });
+        }).then(function(r){
           if(!r.ok) throw new Error(r.error);
-          mcg.tools = (r.result && r.result.tools) || [];
+          var text = ((r.result && r.result.content) || []).map(function(c){ return c.text || ""; }).join("\n");
           ui.preview.innerHTML = planHtml("Mini Course Generator") +
-            '<details><summary>Connection details <span class="chev">+</span></summary><div class="body"><div class="copyblock" id="mcgTools">' +
-            esc(JSON.stringify(mcg.tools.map(function(t){ return { name:t.name, description:t.description, input:t.inputSchema }; }), null, 2)) + '</div>' +
-            '<div class="actions"><button class="inlinebtn" type="button" id="mcgCopyTools">Copy details</button></div></div></details>';
+            '<details open><summary>Connection details <span class="chev">+</span></summary><div class="body">' +
+            '<div class="actions"><button class="btn" type="button" id="mcgCopyTools">Copy details</button></div>' +
+            '<div class="copyblock" id="mcgTools" style="max-height:220px;overflow:auto">' + esc(text) + '</div></div></details>';
           $("mcgCopyTools").addEventListener("click", function(){ copyText($("mcgTools").textContent, this); });
         });
       },
