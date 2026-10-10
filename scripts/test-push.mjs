@@ -34,7 +34,8 @@ if (what === "ghl") {
   await post("/api/whop/check", { apiKey: env.WHOP_API_KEY, companyId: env.WHOP_COMPANY_ID });
 } else if (what === "whop") {
   const c = await post("/api/whop/check", { apiKey: env.WHOP_API_KEY, companyId: env.WHOP_COMPANY_ID });
-  const exp = (c.experiences || []).find((e) => e.isCourses);
+  const list = (c.experiences || []).filter((e) => e.isCourses);
+  const exp = list.find((e) => e.id === env.WHOP_EXPERIENCE_ID) || list.find((e) => e.name === "Courses") || list[0];
   if (!exp) { console.log("No Courses experience found on that company."); process.exit(1); }
   await post("/api/whop/push", { apiKey: env.WHOP_API_KEY, experienceId: exp.id, course });
 } else {

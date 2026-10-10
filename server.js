@@ -178,17 +178,24 @@ async function whopPush(body) {
   if (!c.ok) throw new HttpError(502, plain("Whop", c));
   created.courseId = c.json.id;
 
+  /* Whop puts one placeholder chapter with one placeholder lesson into every new course.
+     They are filled with the first module and lesson, so nothing empty is left behind. */
+  const spare = Array.isArray(c.json.chapters) ? c.json.chapters.slice() : [];
+  const send = (method, path, data) => call(WHOP + path, { method, headers, body: JSON.stringify(data) });
+
   for (const m of course.modules) {
-    const ch = await call(WHOP + "/course_chapters", {
-      method: "POST", headers, body: JSON.stringify({ course_id: created.courseId, title: m.title })
-    });
+    const reuse = spare.shift();
+    const ch = reuse
+      ? await send("PATCH", "/course_chapters/" + reuse.id, { title: m.title })
+      : await send("POST", "/course_chapters", { course_id: created.courseId, title: m.title });
     if (!ch.ok) throw new HttpError(502, plain("Whop", ch) + " The course was created, but it stopped at a chapter.", { created });
     created.chapters++;
+    const spareLessons = reuse && Array.isArray(reuse.lessons) ? reuse.lessons.slice() : [];
     for (const l of m.lessons) {
-      const ls = await call(WHOP + "/course_lessons", {
-        method: "POST", headers,
-        body: JSON.stringify({ chapter_id: ch.json.id, lesson_type: "text", title: l.title, content: l.content_md })
-      });
+      const old = spareLessons.shift();
+      const ls = old
+        ? await send("PATCH", "/course_lessons/" + old.id, { lesson_type: "text", title: l.title, content: l.content_md })
+        : await send("POST", "/course_lessons", { chapter_id: ch.json.id, lesson_type: "text", title: l.title, content: l.content_md });
       if (!ls.ok) throw new HttpError(502, plain("Whop", ls) + " The course was created, but it stopped at a lesson.", { created });
       created.lessons++;
     }

@@ -153,7 +153,7 @@
 
   /* ================= generation ================= */
 
-  var AI_MODELS = { anthropic:"claude-sonnet-5-5", openai:"gpt-4.1", gemini:"gemini-2.5-flash" };
+  var AI_MODELS = { anthropic:"claude-sonnet-5-5", openai:"gpt-4.1", gemini:"gemini-flash-latest" };
 
   function openGen(){
     $("promptOut").value = buildPrompt(S.answers);
