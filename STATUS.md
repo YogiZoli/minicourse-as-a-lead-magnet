@@ -15,7 +15,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Part | State |
 |---|---|
 | 12 questions, email gate, Prompt Pack, paste back | works, tested in browser |
-| Own AI key mode (Anthropic, OpenAI, Gemini) | Gemini verified with `scripts/test-ai.mjs` (same request as the browser, valid outline in 26 s). Anthropic and OpenAI not tested, no keys |
+| Own AI key mode | Gemini only, verified with `scripts/test-ai.mjs`. Claude, ChatGPT and Grok are listed but disabled ("coming soon"). The Claude and ChatGPT calls exist in `callAi()` but are untested, Grok is not written |
 | PDF, .md, outline .json | works. PDF layout not yet reviewed by eye |
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
 | YouTube playlist plan (copy blocks, CSV) | works |

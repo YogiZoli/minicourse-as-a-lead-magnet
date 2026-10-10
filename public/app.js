@@ -186,7 +186,9 @@
   function loadAi(){
     var saved = {};
     try{ saved = JSON.parse(sessionStorage.getItem("mc_ai") || "{}") || {}; }catch(e){}
-    $("aiProvider").value = saved.provider || "anthropic";
+    /* Only Gemini is switched on for now. The other providers are listed but disabled in the page. */
+    $("aiProvider").value = saved.provider || "gemini";
+    if($("aiProvider").selectedIndex < 0 || $("aiProvider").selectedOptions[0].disabled){ $("aiProvider").value = "gemini"; saved.model = ""; }
     $("aiModel").value = saved.model || AI_MODELS[$("aiProvider").value];
     $("aiKey").value = saved.key || "";
   }
