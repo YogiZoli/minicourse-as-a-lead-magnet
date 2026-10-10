@@ -10,3 +10,6 @@
 - 2026-10-10: YouTube sign-in uses the Google token flow in the browser, scope `youtube.force-ssl` only. No Google secret or refresh token exists anywhere.
 - 2026-10-10: The video brief is named Video Course Content Brief, documented in `schema/video-course-content-brief.md`.
 - 2026-10-10: Answers and outline are kept in sessionStorage (this tab only). The AI key is kept in sessionStorage only.
+- 2026-10-10: MCG mapping: one MCG Course, one draft Module, our modules become its Sections, lessons are `info` lessons with a cards block (Teach, Do, Review). No landingPage and no image blocks are sent, so no AI credits are used.
+- 2026-10-10: Whop puts a placeholder chapter and lesson into every new course. They are filled with the first module and lesson (PATCH), not left empty.
+- 2026-10-10: Whop course link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the company route.

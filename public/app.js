@@ -406,16 +406,17 @@
       preview:function(ui){
         var popup = mcg.token ? null : window.open("about:blank", "mcg_oauth", "width=520,height=720");
         var p = mcg.token ? Promise.resolve() : mcgConnect(popup);
+        /* A real dry run: MCG validates the whole course spec and creates nothing. */
         return p.then(function(){
-          return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:"get_content_format", arguments:{} } });
-        }).then(function(r){
-          if(!r.ok) throw new Error(r.error);
-          var text = ((r.result && r.result.content) || []).map(function(c){ return c.text || ""; }).join("\n");
-          ui.preview.innerHTML = planHtml("Mini Course Generator") +
-            '<details open><summary>Connection details <span class="chev">+</span></summary><div class="body">' +
-            '<div class="actions"><button class="btn" type="button" id="mcgCopyTools">Copy details</button></div>' +
-            '<div class="copyblock" id="mcgTools" style="max-height:220px;overflow:auto">' + esc(text) + '</div></div></details>';
-          $("mcgCopyTools").addEventListener("click", function(){ copyText($("mcgTools").textContent, this); });
+          return mcgTool("module_push", { spec:Outline.mcgSpec(S.outline), dryRun:true });
+        }).then(function(){
+          var o = S.outline, k = Outline.counts(o);
+          ui.preview.innerHTML = '<strong>Preview. Nothing has been created yet.</strong>' +
+            '<span>Mini Course Generator checked the course and accepted it. This will create:</span><ul>' +
+            '<li>1 course: ' + esc(o.course.title) + '</li>' +
+            '<li>1 draft module with ' + k.modules + ' sections: ' + esc(o.modules.map(function(m){ return m.title; }).join(", ")) + '</li>' +
+            '<li>' + k.lessons + ' lessons with their Teach, Do, Review content</li></ul>' +
+            '<span>No images are generated, so it uses none of your AI credits. The module stays a draft until you publish it.</span>';
         });
       },
       confirm:function(){ return mcgCreate(); },
@@ -521,9 +522,49 @@
     }, function(e){ try{ popup.close(); }catch(x){} throw e; });
   }
 
-  /* Filled in once the MCG tool list is verified against a real account. */
+  /* One MCG tool call through the proxy. Resolves with the tool's text and parsed data, rejects with MCG's own words. */
+  function mcgTool(name, args){
+    return api("/api/mcg/rpc", { accessToken:mcg.token, method:"tools/call", params:{ name:name, arguments:args } }).then(function(r){
+      if(!r.ok){
+        if(/401|did not accept/.test(r.error || "")) mcg.token = "";
+        throw new Error(r.error);
+      }
+      var res = r.result || {};
+      var text = (res.content || []).map(function(c){ return c.text || ""; }).join("\n").trim();
+      if(res.isError) throw new Error("Mini Course Generator said: " + (text || "the request failed.").slice(0, 400));
+      var data = res.structuredContent || null;
+      if(!data){ try{ data = JSON.parse(text); }catch(e){ data = null; } }
+      return { text:text, data:data };
+    });
+  }
+  /* Finds a value in a tool answer by key name, whether it came back as JSON or as plain text. */
+  function mcgPick(r, keys){
+    var found = "";
+    (function walk(v){
+      if(found || !v || typeof v !== "object") return;
+      keys.forEach(function(k){ if(!found && v[k] != null && typeof v[k] !== "object") found = String(v[k]); });
+      Object.keys(v).forEach(function(k){ walk(v[k]); });
+    })(r.data);
+    if(found) return found;
+    for(var i = 0; i < keys.length; i++){
+      var m = new RegExp('"?' + keys[i] + '"?\\s*[:=]\\s*"?([^\\s",}]+)', "i").exec(r.text);
+      if(m) return m[1];
+    }
+    return "";
+  }
+  /* MCG course: one course, one draft module, our modules as its sections, lessons inside. */
   function mcgCreate(){
-    return Promise.resolve({ ok:false, error:"Direct create for Mini Course Generator is not finished yet. Copy the connection details above and send them to the builder." });
+    var o = S.outline, desc = o.course.bold_promise.slice(0, 300), course;
+    return mcgTool("course_create", { name:o.course.title, description:desc }).then(function(r){
+      course = { id:mcgPick(r, ["courseId", "collectionId", "id"]), link:mcgPick(r, ["previewUrl", "url"]) };
+      if(!course.id) throw new Error("Mini Course Generator created the course but did not say its ID, so the lessons could not be added. It answered: " + r.text.slice(0, 300));
+      return mcgTool("module_push", { spec:Outline.mcgSpec(o), courseId:course.id, description:desc });
+    }).then(function(){
+      return { ok:true, message:"Created in Mini Course Generator as a draft module. Publish it there when you are ready.", link:/^https?:\/\//.test(course.link) ? course.link : "" };
+    }, function(e){
+      if(course && course.id) throw new Error(e.message + " The empty course was created, but its lessons were not added.");
+      throw e;
+    });
   }
 
   /* ---------- Google sign-in for the one YouTube call ---------- */

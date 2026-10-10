@@ -278,7 +278,69 @@
     };
   }
 
+  /* ---------- Mini Course Generator module spec (YAML, apiVersion mcg.io/v3) ---------- */
+
+  /* Block-style YAML. Every string is written as a JSON string, which is a valid YAML double-quoted scalar. */
+  function yaml(v, pad) {
+    pad = pad || "";
+    if (Array.isArray(v)) {
+      if (!v.length) return " []";
+      return v.map(function (item) {
+        if (item && typeof item === "object") return "\n" + pad + "-" + yaml(item, pad + "  ").replace(/^\n\s*/, " ");
+        return "\n" + pad + "- " + JSON.stringify(item);
+      }).join("");
+    }
+    if (v && typeof v === "object") {
+      return Object.keys(v).map(function (k) {
+        var x = v[k];
+        return "\n" + pad + k + ":" + (x && typeof x === "object" ? yaml(x, pad + "  ") : " " + (typeof x === "string" ? JSON.stringify(x) : String(x)));
+      }).join("");
+    }
+    return " " + JSON.stringify(v);
+  }
+
+  function mcgLessonContent(l) {
+    var boxes = [{
+      header: "Teach, Do, Review",
+      block: {
+        type: "cards",
+        items: [
+          { title: "Teach, " + l.teach.minutes + " min", body: l.teach.points.map(function (p) { return "- " + p; }).join("\n") || "-" },
+          { title: "Do, " + l["do"].minutes + " min", body: l["do"].exercise || "-" },
+          { title: "Review, " + l.review.minutes + " min", body: l.review.check || "-" }
+        ]
+      }
+    }];
+    if (l.relevance) boxes[0].intro = "**Why this matters:** " + l.relevance;
+    if (l.resources.length) {
+      boxes.push({
+        header: "Resources",
+        block: { type: "cards", items: l.resources.map(function (r) { return { title: r.title, body: r.description || r.type || "-" }; }) }
+      });
+    }
+    return boxes;
+  }
+
+  /* One MCG module for the whole minicourse: our modules become its sections. No image blocks, so no AI credits. */
+  function mcgSpec(o) {
+    return yaml({
+      apiVersion: "mcg.io/v3",
+      kind: "Module",
+      metadata: { name: o.course.title },
+      spec: {
+        language: "en",
+        sections: o.modules.map(function (m) {
+          return {
+            title: m.title,
+            lessons: m.lessons.map(function (l) { return { title: l.title, type: "info", content: mcgLessonContent(l) }; })
+          };
+        })
+      }
+    }).replace(/^\n/, "") + "\n";
+  }
+
   return {
+    mcgSpec: mcgSpec,
     SCHEMA_VERSION: SCHEMA_VERSION,
     extractJson: extractJson, normalize: normalize, lessons: lessons, counts: counts, lessonMinutes: lessonMinutes,
     lessonContentMd: lessonContentMd, blueprintMd: blueprintMd,

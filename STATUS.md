@@ -21,13 +21,13 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
 | Whop push | works end to end, tested on FreedompreneurAI, Courses experience. Two hidden test courses exist there: `cors_xcrIup1Ssb5mz` (has a leftover placeholder chapter) and `cors_FGVYRfhMOeUup` (clean). The "Open it" link is `whop.com/experiences/{exp_id}/`, which Whop redirects to the right company route |
-| MCG push | sign-in and tool listing built, course creation not built (tool list needed from a signed-in account) |
+| MCG push | sign-in works (tested live by Zoltan). Create is written: `course_create` then one `module_push` (our modules become sections), with a real `dryRun` in the preview. Not yet run against the account |
 | Skool export | works |
 | YouTube playlist | works end to end, tested live by Zoltan on 2026-10-10 (unlisted playlist created) |
 
 ## Next step
 
-2. Zoltan: click Connect Mini Course Generator on the result screen, copy the connection details, send them. Then write `mcgCreate()` in `public/app.js`.
+2. Zoltan: run the MCG push once on the live page (Connect, then Confirm and create) and report the result.
 4. Fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js`.
 5. Review the PDF and one GHL lesson body by eye.
 6. After all pushes work: 6-line summary, then the brand-design duplicate on a separate route.
