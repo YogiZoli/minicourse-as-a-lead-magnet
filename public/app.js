@@ -524,6 +524,7 @@
       previewLabel:"Check my key and preview",
       previewWait:"Checking your key with Whop. A few seconds.",
       signIn:true,
+      label:function(){ return conn.whop.token ? "Preview (Whop is connected)" : this.previewLabel; },
       setup:function(){
         var on = !!ENV.WHOP_CLIENT_ID;
         $("whopAlt").open = !on;
@@ -577,6 +578,7 @@
     ghl: {
       previewLabel:"Preview",
       signIn:true,
+      label:function(){ return conn.ghl.token ? "Preview (GoHighLevel is connected)" : this.previewLabel; },
       setup:function(){
         var on = !!ENV.GHL_CLIENT_ID;
         $("ghlAlt").open = !on;
@@ -599,7 +601,7 @@
         var popup = conn.ghl.token ? null : window.open("about:blank", "connect_crm", "width=560,height=780");
         return (conn.ghl.token ? Promise.resolve() : ghlConnect(popup)).then(function(){
           conn.ghl.use = { token:conn.ghl.token, locationId:conn.ghl.locationId };
-          ui.preview.innerHTML = planHtml("the GoHighLevel sub-account you picked", note);
+          ui.preview.innerHTML = '<strong>Connected to GoHighLevel.</strong>' + planHtml("the sub-account you picked (" + conn.ghl.locationId + ")", note);
         });
       },
       confirm:function(){
@@ -616,6 +618,7 @@
     mcg: {
       previewLabel:"Connect Mini Course Generator",
       signIn:true,
+      label:function(){ return mcg.token ? "Preview (Mini Course Generator is connected)" : this.previewLabel; },
       previewWait:"Waiting for you to sign in in the small window. After that, Mini Course Generator checks the course. Nothing is created yet.",
       confirmWait:"Creating the course and its lessons in Mini Course Generator. This takes up to a minute. Keep this tab open until you see the result.",
       /* The sign-in window has to open inside the click, before any waiting, or the browser blocks it. */
@@ -669,13 +672,17 @@
       '<div class="actions" data-r="confirm" hidden><button class="btn big" type="button" data-a="confirm">Confirm and create</button><button class="btn ghost" type="button" data-a="cancel">Cancel</button></div>' +
       '<p class="status" role="status" hidden></p>' +
       '<div class="actions" data-r="stop" hidden><button class="btn ghost" type="button" data-a="stop">Stop waiting</button></div>' +
-      '<p class="okmsg" role="status" hidden></p>';
+      '<div class="okmsg" role="status" hidden></div>' +
+      '<div class="actions" data-r="again" hidden><button class="btn ghost" type="button" data-a="again">Create it again</button></div>';
     var ui = {
       err:host.querySelector(".formerr"), preview:host.querySelector(".preview"), ok:host.querySelector(".okmsg"), status:host.querySelector(".status"),
-      start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]'), stop:host.querySelector('[data-r="stop"]')
+      start:host.querySelector('[data-r="start"]'), confirm:host.querySelector('[data-r="confirm"]'), stop:host.querySelector('[data-r="stop"]'),
+      again:host.querySelector('[data-r="again"]')
     };
+    /* Once signed in, the button no longer says Connect. */
+    function relabel(){ ui.start.querySelector("button").textContent = def.label ? def.label() : def.previewLabel; }
     var busyNow = false;
-    function reset(){ ui.preview.hidden = true; ui.confirm.hidden = true; ui.start.hidden = false; }
+    function reset(){ ui.preview.hidden = true; ui.confirm.hidden = true; ui.start.hidden = false; ui.again.hidden = true; relabel(); }
     function lock(on){
       busyNow = on;
       Array.prototype.forEach.call(host.querySelectorAll("button"), function(b){ if(b.dataset.a !== "stop") b.disabled = on; });
@@ -695,6 +702,7 @@
       if(busyNow) return;
       var a = b.dataset.a, stop;
       if(a === "cancel"){ reset(); return; }
+      if(a === "again"){ ui.ok.hidden = true; reset(); logEvent(name + ": wants to create it again"); return; }
       setErr(ui.err, ""); ui.ok.hidden = true;
       if(a === "preview"){
         lock(true);
@@ -702,6 +710,7 @@
         logEvent(name + ": preview started");
         run(function(){ return def.preview(ui); }).then(function(){
           ui.preview.hidden = false; ui.confirm.hidden = false; ui.start.hidden = true;
+          relabel();
           logEvent(name + ": preview shown, nothing created yet");
         }, function(e){ logEvent(name + ": preview failed: " + (e && e.message)); fail(e); })
           .then(function(){ stop(); lock(false); });
@@ -712,7 +721,9 @@
         run(function(){ return def.confirm(); }).then(function(r){
           if(!r || !r.ok) throw new Error((r && r.error) || "Something went wrong. Try again.");
           reset();
-          ui.ok.innerHTML = esc(def.done(r)) + (r.link ? ' <a href="' + esc(r.link) + '" target="_blank" rel="noopener">Open it</a>' : "");
+          /* The result takes the place of the start button, so a finished push cannot be mistaken for one that has not run. */
+          ui.start.hidden = true; ui.again.hidden = false;
+          ui.ok.innerHTML = '<strong>Created.</strong> ' + esc(def.done(r)) + (r.link ? '<div class="actions" style="margin-top:8px"><a class="btn" href="' + esc(r.link) + '" target="_blank" rel="noopener">Open it</a></div>' : "");
           ui.ok.hidden = false;
           ui.ok.scrollIntoView({ behavior:"smooth", block:"nearest" });
           logEvent(name + ": created" + (r.link ? " " + r.link : ""));

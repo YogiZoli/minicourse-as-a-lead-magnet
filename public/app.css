@@ -125,6 +125,10 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none;bor
   background:var(--success-surface);color:var(--success);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);
 }
 .okmsg:empty{display:none}
+.okmsg{border:var(--border-width) solid var(--success);font-size:1rem;line-height:1.5}
+.okmsg strong{font-weight:var(--weight-extrabold)}
+.okmsg .btn{background:var(--success);color:#FFFFFF}
+.okmsg a.btn{font-family:var(--font-sans);font-weight:var(--weight-bold);color:#FFFFFF}
 .okmsg a,.cta a{color:var(--link);font-family:var(--font-mono);font-size:var(--text-sm);font-weight:500;text-decoration:none}
 .okmsg a:hover,.cta a:hover{color:var(--link-hover);text-decoration:underline;text-underline-offset:2px}
 .preview{
