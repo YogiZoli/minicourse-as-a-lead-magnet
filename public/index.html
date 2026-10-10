@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minicourse as a Lead Magnet</title>
+<meta name="description" content="Answer 12 short questions and get a complete course outline you can push straight into your course platform.">
+<style>
+  :root{
+    --ground:#FFFFFF; --surface:#FFFFFF; --surface-2:#F4F6F5; --ink:#121A16;
+    --muted:#55635C; --line:#DCE3DF; --green:#17C05B; --green-deep:#10A34B;
+    --green-soft:#17C05B16; --on-green:#FFFFFF; --red:#E0243B;
+    --shadow:0 1px 2px #121a1610, 0 6px 18px -10px #121a1626;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0A120E; --surface:#121C17; --surface-2:#18241E; --ink:#EAF2EE;
+      --muted:#93A69C; --line:#22332B; --green:#19C862; --green-deep:#13A853;
+      --green-soft:#19C86222; --on-green:#04140A; --red:#FF5A6E;
+      --shadow:0 1px 2px #0007, 0 10px 26px -14px #000a;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0A120E; --surface:#121C17; --surface-2:#18241E; --ink:#EAF2EE;
+    --muted:#93A69C; --line:#22332B; --green:#19C862; --green-deep:#13A853;
+    --green-soft:#19C86222; --on-green:#04140A; --red:#FF5A6E;
+    --shadow:0 1px 2px #0007, 0 10px 26px -14px #000a;
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{
+    margin:0;
+    background:var(--ground);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:16px;line-height:1.45;
+    padding-inline:16px;padding-block:10px 36px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:11px}
+  .screen{display:flex;flex-direction:column;gap:11px}
+
+  header{text-align:center;margin-bottom:1px}
+  h1{margin:0;font-weight:800;letter-spacing:-.025em;line-height:1.15;font-size:clamp(20px,5.4vw,32px);text-wrap:balance}
+  .sub{margin:2px 0 0;font-size:clamp(12.5px,3.2vw,15px);font-weight:700;color:var(--muted)}
+  h2{margin:0;font-size:clamp(17px,4.2vw,22px);font-weight:800;letter-spacing:-.02em;line-height:1.2;text-wrap:balance}
+  h3{margin:0;font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+  p{margin:0}
+
+  /* ---------- green band ---------- */
+  .band{background:var(--green);color:var(--on-green);border-radius:14px;padding:16px 15px;display:flex;flex-direction:column;gap:10px}
+  .steptag{
+    display:inline-flex;align-items:center;gap:6px;color:var(--on-green);opacity:.92;
+    font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  }
+  .band h2{font-size:clamp(20px,5.2vw,28px)}
+  .band .desc{font-size:clamp(14px,3.5vw,16px);font-weight:700;line-height:1.4}
+  .band ul{margin:0;padding-left:19px;font-weight:700;font-size:14.5px;display:flex;flex-direction:column;gap:3px}
+  .band .btn{background:var(--surface);color:var(--ink);align-self:flex-start;font-size:16px;padding:14px 20px;box-shadow:0 2px 12px #00000033}
+  .band .btn:hover{background:var(--surface-2)}
+  .band .btn:focus-visible{outline:3px solid #fff}
+
+  /* ---------- cards ---------- */
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:16px 15px 17px;display:flex;flex-direction:column;gap:11px}
+  .card.key{border:2px solid var(--green)}
+  .hint{font-size:13.5px;font-weight:600;color:var(--muted);line-height:1.4}
+  .why{font-size:13.5px;font-weight:700;color:var(--green-deep);line-height:1.4}
+  .flabel{font-size:13.5px;font-weight:800;display:block;margin:0 0 6px}
+  .field{display:flex;flex-direction:column;min-width:0}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media (max-width:620px){.fields{grid-template-columns:1fr}}
+
+  input[type=text],input[type=email],input[type=password],textarea,select{
+    width:100%;border:2px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:11px;
+    padding:12px 13px;font-family:inherit;font-size:16px;font-weight:700;
+  }
+  textarea{min-height:120px;resize:vertical;line-height:1.4;font-weight:600}
+  textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;font-weight:500;min-height:170px}
+  select{
+    appearance:none;cursor:pointer;padding-right:36px;
+    background:var(--surface-2) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none' stroke='%2355635C' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5'/%3E%3C/svg%3E") no-repeat right 13px center/12px 8px;
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--green)}
+
+  .btn{appearance:none;border:0;background:var(--green);color:var(--on-green);cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:800;padding:11px 17px;border-radius:10px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+  .btn:hover{background:var(--green-deep)}
+  .btn:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+  .btn.ghost{background:var(--surface-2);color:var(--ink);border:2px solid var(--line);padding:9px 15px}
+  .btn.ghost:hover{border-color:var(--green)}
+  .btn.big{font-size:16px;padding:14px 18px}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .actions.spread{justify-content:space-between}
+  .formerr{color:var(--red);font-size:13.5px;font-weight:700}
+  .okmsg{color:var(--green-deep);font-size:14.5px;font-weight:800}
+  .okmsg a,.cta a{color:var(--green-deep);font-weight:800}
+
+  /* ---------- questions ---------- */
+  .progress{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+  .progress i{display:block;height:100%;background:var(--green);border-radius:999px;transition:width .25s ease}
+  .qcount{font-size:11.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .qtitle{font-size:clamp(19px,4.9vw,25px)}
+  .choices{display:flex;flex-direction:column;gap:8px}
+  .choice{display:flex;align-items:center;gap:10px;border:2px solid var(--line);background:var(--surface-2);border-radius:11px;padding:12px 13px;cursor:pointer;font-weight:700;font-size:15.5px}
+  .choice:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+  .choice input{accent-color:var(--green);width:18px;height:18px;flex:none;margin:0}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--surface-2);border-radius:12px;padding:5px}
+  .tab{appearance:none;border:0;background:transparent;color:var(--muted);font-family:inherit;font-size:14.5px;font-weight:800;padding:10px 8px;border-radius:9px;cursor:pointer}
+  .tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .tab:focus-visible{outline:3px solid var(--green);outline-offset:1px}
+  .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:14.5px;font-weight:600}
+
+  /* ---------- result ---------- */
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media (max-width:520px){.facts{grid-template-columns:1fr}}
+  .fact{background:var(--surface-2);border-radius:11px;padding:10px 12px}
+  .fact b{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
+  .fact span{font-size:14.5px;font-weight:700}
+  details{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow)}
+  summary{cursor:pointer;padding:13px 15px;list-style:none;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+  summary::-webkit-details-marker{display:none}
+  summary .chev{margin-left:auto;color:var(--green-deep);font-size:19px;font-weight:800;line-height:1}
+  summary .tag{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--green-deep);background:var(--green-soft);border-radius:999px;padding:3px 9px}
+  details[open] > summary .chev{transform:rotate(45deg)}
+  summary:focus-visible{outline:3px solid var(--green);outline-offset:-3px}
+  .body{padding:13px 15px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:11px}
+  .mod{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--green-deep);margin-top:4px}
+  .lesson{border:1px solid var(--line);border-radius:11px;padding:11px 12px;display:flex;flex-direction:column;gap:6px}
+  .lesson .lt{font-weight:800;font-size:15px}
+  .lesson .meta{font-size:13px;font-weight:600;color:var(--muted)}
+  .tdr{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  @media (max-width:520px){.tdr{grid-template-columns:1fr}}
+  .tdr div{background:var(--surface-2);border-radius:9px;padding:8px 10px;font-size:13px;font-weight:600}
+  .tdr b{display:block;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--green-deep);font-weight:800}
+  .copyblock{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600;white-space:pre-wrap;word-break:break-word}
+  .preview{background:var(--green-soft);border:1px solid var(--green);border-radius:11px;padding:11px 12px;font-size:14px;font-weight:600;display:flex;flex-direction:column;gap:6px}
+  .preview ul{margin:0;padding-left:19px}
+  .cta{font-size:15.5px;font-weight:700;line-height:1.4}
+  .inlinebtn{appearance:none;border:0;background:none;color:var(--green-deep);font:inherit;font-size:13px;font-weight:800;cursor:pointer;padding:0;text-decoration:underline}
+
+  footer{color:var(--muted);font-size:12.5px;font-weight:600;line-height:1.55;text-align:center}
+  @media (prefers-reduced-motion: reduce){.progress i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1>Minicourse as a Lead Magnet</h1>
+    <p class="sub">Turn what you know into a complete course outline</p>
+  </header>
+
+  <!-- INTRO -->
+  <section class="screen" id="sIntro">
+    <div class="band">
+      <span class="steptag">12 short questions</span>
+      <h2>Your course, outlined and inside your platform today</h2>
+      <p class="desc">Answer in your own words. You get a full blueprint: modules, lessons, and a Teach, Do, Review plan for every session.</p>
+      <ul>
+        <li>My Course Blueprint as a PDF</li>
+        <li>A video brief and a YouTube playlist plan for every lesson</li>
+        <li>One click to create it in Whop, GoHighLevel or Mini Course Generator</li>
+      </ul>
+      <button class="btn" type="button" id="startBtn">Start with question 1</button>
+    </div>
+    <p class="hint" style="text-align:center">Takes about 10 minutes. Nothing you type is stored on our server.</p>
+  </section>
+
+  <!-- QUESTIONS -->
+  <section class="screen" id="sQuiz" hidden>
+    <div class="progress" aria-hidden="true"><i id="qBar" style="width:0"></i></div>
+    <form class="card" id="qForm" novalidate>
+      <span class="qcount" id="qCount"></span>
+      <h2 class="qtitle" id="qTitle" tabindex="-1"></h2>
+      <p class="why" id="qWhy"></p>
+      <div id="qInput"></div>
+      <p class="formerr" id="qErr" role="alert" hidden></p>
+      <div class="actions spread">
+        <button class="btn ghost" type="button" id="qBack">Back</button>
+        <button class="btn big" type="submit" id="qNext">Next</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- EMAIL GATE -->
+  <section class="screen" id="sGate" hidden>
+    <form class="card key" id="gateForm" novalidate>
+      <h2 id="gateTitle" tabindex="-1">Where should I send your blueprint follow-up?</h2>
+      <p class="hint">Your answers are ready. Add your name and email, then build the outline on the next screen.</p>
+      <div class="fields">
+        <div class="field">
+          <label class="flabel" for="leadName">First name</label>
+          <input id="leadName" name="name" type="text" autocomplete="given-name" maxlength="60" required>
+        </div>
+        <div class="field">
+          <label class="flabel" for="leadEmail">Email</label>
+          <input id="leadEmail" name="email" type="email" autocomplete="email" maxlength="120" inputmode="email" required>
+        </div>
+      </div>
+      <p class="formerr" id="gateErr" role="alert" hidden></p>
+      <div class="actions spread">
+        <button class="btn ghost" type="button" id="gateBack">Back</button>
+        <button class="btn big" type="submit">Build my course outline</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- GENERATION -->
+  <section class="screen" id="sGen" hidden>
+    <div class="card">
+      <h2 id="genTitle" tabindex="-1">Build your outline</h2>
+      <p class="hint">Two ways to do it. Both give the same result.</p>
+      <div class="tabs" role="tablist">
+        <button class="tab" type="button" role="tab" id="tabPack" aria-selected="true" aria-controls="panePack">Prompt Pack</button>
+        <button class="tab" type="button" role="tab" id="tabKey" aria-selected="false" aria-controls="paneKey">My own AI key</button>
+      </div>
+
+      <div id="panePack" role="tabpanel" aria-labelledby="tabPack" class="screen">
+        <ol class="steps">
+          <li>Copy the prompt below.</li>
+          <li>Paste it into Claude, ChatGPT or Gemini and send it.</li>
+          <li>Copy the whole answer and paste it into the box at the bottom.</li>
+        </ol>
+        <textarea class="mono" id="promptOut" readonly aria-label="Your prompt"></textarea>
+        <div class="actions">
+          <button class="btn" type="button" id="copyPrompt">Copy the prompt</button>
+          <span class="okmsg" id="copyPromptMsg" role="status"></span>
+        </div>
+        <label class="flabel" for="pasteIn" style="margin:6px 0 0">Paste the AI answer here</label>
+        <textarea class="mono" id="pasteIn" placeholder='Starts with { and ends with }' spellcheck="false"></textarea>
+        <p class="formerr" id="pasteErr" role="alert" hidden></p>
+        <div class="actions"><button class="btn big" type="button" id="usePaste">Show my blueprint</button></div>
+      </div>
+
+      <div id="paneKey" role="tabpanel" aria-labelledby="tabKey" class="screen" hidden>
+        <div class="fields">
+          <div class="field">
+            <label class="flabel" for="aiProvider">AI provider</label>
+            <select id="aiProvider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+              <option value="gemini">Google (Gemini)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="flabel" for="aiModel">Model</label>
+            <input id="aiModel" type="text" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label class="flabel" for="aiKey">Your API key</label>
+          <input id="aiKey" type="password" autocomplete="off" spellcheck="false">
+        </div>
+        <p class="hint">Your key stays in this browser tab and goes straight from your browser to the AI provider. It is never sent to our server.</p>
+        <p class="formerr" id="aiErr" role="alert" hidden></p>
+        <div class="actions">
+          <button class="btn big" type="button" id="aiGo">Generate my outline</button>
+          <span class="hint" id="aiStatus" role="status"></span>
+        </div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn ghost" type="button" id="genBack">Edit my answers</button></div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="sResult" hidden>
+    <div class="band">
+      <span class="steptag">My Course Blueprint</span>
+      <h2 id="rTitle" tabindex="-1"></h2>
+      <p class="desc" id="rPromise"></p>
+    </div>
+
+    <div class="card">
+      <div class="facts" id="rFacts"></div>
+      <div class="actions">
+        <button class="btn big" type="button" id="dlPdf">Download the PDF</button>
+        <button class="btn ghost" type="button" id="dlMd">Download as .md</button>
+        <button class="btn ghost" type="button" id="dlJson">Outline .json</button>
+      </div>
+      <p class="hint" id="pdfMsg" role="status"></p>
+    </div>
+
+    <details open>
+      <summary>Modules and lessons <span class="chev">+</span></summary>
+      <div class="body" id="rLessons"></div>
+    </details>
+
+    <details>
+      <summary>Video Course Content Brief <span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">One brief per lesson: title, keyword, hook, Teach, Do, Review and CTA. Hand it to whoever records the videos.</p>
+        <div class="actions">
+          <button class="btn" type="button" id="dlBriefJson">Whole course .json</button>
+          <button class="btn ghost" type="button" id="dlBriefMd">Whole course .md</button>
+        </div>
+        <div id="rBriefs" class="screen"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>YouTube playlist plan <span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Your lessons in order, with titles and descriptions written for YouTube search.</p>
+        <div class="actions"><button class="btn" type="button" id="dlYtCsv">Download as CSV</button></div>
+        <div id="rYt" class="screen"></div>
+      </div>
+    </details>
+
+    <h2 style="margin-top:8px">Put it in your course platform</h2>
+    <p class="hint">Each one shows you a preview first. Nothing is created until you confirm.</p>
+
+    <details id="pWhop">
+      <summary>Whop <span class="tag">Direct push</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Creates the course, its chapters and lessons as a hidden draft. You need a company API key with the courses permissions, and the Courses app added to your whop.</p>
+        <div class="fields">
+          <div class="field"><label class="flabel" for="whopKey">Whop API key</label><input id="whopKey" type="password" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label class="flabel" for="whopCompany">Company ID</label><input id="whopCompany" type="text" placeholder="biz_..." autocomplete="off" spellcheck="false"></div>
+        </div>
+        <p class="hint">The company ID is in your dashboard address: whop.com/dashboard/biz_...</p>
+        <div class="push" data-platform="whop"></div>
+      </div>
+    </details>
+
+    <details id="pGhl">
+      <summary>GoHighLevel <span class="tag">Direct push</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Imports the course into Memberships. Modules become categories, lessons become draft posts. You need a Private Integration Token from Settings, Private Integrations.</p>
+        <div class="fields">
+          <div class="field"><label class="flabel" for="ghlLocation">Location ID</label><input id="ghlLocation" type="text" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label class="flabel" for="ghlToken">Private Integration Token</label><input id="ghlToken" type="password" placeholder="pit-..." autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="push" data-platform="ghl"></div>
+      </div>
+    </details>
+
+    <div class="card key" id="snapshotPanel" hidden>
+      <h3>Turn this course into your opt-in lead magnet</h3>
+      <p class="hint">One snapshot adds the opt-in page, thank-you page, course access workflow and delivery email.</p>
+      <div class="actions"><a class="btn" id="snapshotLink" href="#" target="_blank" rel="noopener">Get the snapshot</a></div>
+    </div>
+
+    <details id="pMcg">
+      <summary>Mini Course Generator <span class="tag">Direct push</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Sign in to Mini Course Generator in a small window. No key to copy.</p>
+        <div class="push" data-platform="mcg"></div>
+      </div>
+    </details>
+
+    <details id="pSkool">
+      <summary>Skool <span class="tag">Copy and paste</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Skool has no public API, so this one is copy and paste. Create the course in Classroom, then add each module and lesson from here.</p>
+        <div class="actions"><button class="btn" type="button" id="dlSkoolCsv">Download as CSV</button></div>
+        <div id="rSkool" class="screen"></div>
+      </div>
+    </details>
+
+    <details id="pYt">
+      <summary>YouTube playlist <span class="tag">Direct push</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Creates one empty playlist on your channel, ready for your lesson videos. It does nothing else on your account.</p>
+        <div class="field"><label class="flabel" for="ytTitle">Playlist title</label><input id="ytTitle" type="text" maxlength="150"></div>
+        <div class="field"><label class="flabel" for="ytDesc">Description</label><textarea id="ytDesc"></textarea></div>
+        <div class="field">
+          <label class="flabel" for="ytPrivacy">Who can see it</label>
+          <select id="ytPrivacy">
+            <option value="unlisted" selected>Unlisted: only people with the link</option>
+            <option value="private">Private: only you</option>
+            <option value="public">Public: everyone</option>
+          </select>
+        </div>
+        <div class="push" data-platform="youtube"></div>
+      </div>
+    </details>
+
+    <div class="card key">
+      <p class="cta">Next step: build and launch this course with a group in my 6-pillar cohort program. <a id="programLink" href="#" target="_blank" rel="noopener">See the program</a></p>
+    </div>
+
+    <div class="actions"><button class="btn ghost" type="button" id="startOver">Start a new outline</button></div>
+  </section>
+
+  <footer>Your answers, keys and outline are never stored on our server.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="/env.js"></script>
+<script src="/config.js"></script>
+<script src="/outline.js"></script>
+<script src="/questions.js"></script>
+<script src="/pdf.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "minicourse-as-a-lead-magnet/outline.schema.json",
+  "title": "Course outline",
+  "description": "The one format both generation modes (Prompt Pack and own AI key) must produce. Version 1.0.",
+  "type": "object",
+  "required": ["schema_version", "course", "modules"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "course": {
+      "type": "object",
+      "required": ["title", "bold_promise", "ideal_client"],
+      "properties": {
+        "title": { "type": "string", "description": "Program name" },
+        "format": { "type": "string", "description": "Program format" },
+        "bold_promise": { "type": "string" },
+        "ideal_client": { "type": "string" },
+        "delivered_by": { "type": "string", "description": "Who delivers" },
+        "unique_approach": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "summary": { "type": "string" },
+            "visual": { "type": "string", "description": "How to visualize it" },
+            "rationale": { "type": "string" }
+          }
+        },
+        "sessions": {
+          "type": "object",
+          "properties": {
+            "count": { "type": "integer", "description": "Total lessons. Recomputed on load." },
+            "duration_minutes": { "type": "integer" }
+          }
+        },
+        "cta": { "type": "string", "description": "Next step after the course" }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title", "lessons"],
+        "properties": {
+          "position": { "type": "integer", "description": "1-based. Renumbered on load." },
+          "title": { "type": "string", "description": "Process step" },
+          "outcome": { "type": "string" },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["title", "teach", "do", "review"],
+              "properties": {
+                "position": { "type": "integer", "description": "1-based inside the module. Renumbered on load." },
+                "playlist_position": { "type": "integer", "description": "1-based across the whole course. Renumbered on load." },
+                "title": { "type": "string" },
+                "relevance": { "type": "string" },
+                "keyword": { "type": "string" },
+                "hook": { "type": "string" },
+                "teach": {
+                  "type": "object",
+                  "properties": { "minutes": { "type": "integer" }, "points": { "type": "array", "items": { "type": "string" } } }
+                },
+                "do": {
+                  "type": "object",
+                  "properties": { "minutes": { "type": "integer" }, "exercise": { "type": "string" } }
+                },
+                "review": {
+                  "type": "object",
+                  "properties": { "minutes": { "type": "integer" }, "check": { "type": "string" } }
+                },
+                "rationale": { "type": "string" },
+                "resources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["title"],
+                    "properties": { "title": { "type": "string" }, "type": { "type": "string" }, "description": { "type": "string" } }
+                  }
+                },
+                "cta": { "type": "string" },
+                "youtube": {
+                  "type": "object",
+                  "properties": { "title": { "type": "string", "maxLength": 100 }, "description": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
