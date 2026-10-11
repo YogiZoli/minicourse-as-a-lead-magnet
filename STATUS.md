@@ -39,7 +39,7 @@ All five targets work. v2 is functionally complete.
 1. Zoltan: fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js` (still empty or placeholder).
 2. Zoltan: review the brand design and the PDF by eye, and one lesson body in GHL, Whop and MCG.
 3. Zoltan has more UI requests (one known: feedback after an action is too small). He wants them as a separate round.
-3b. Zoltan hands `docs/ITV-COURSE-IMPORT-PROMPT.md` to the IdeaToVideo folder when he wants. M2, M4 and M5 are dropped for good (see DECISIONS 2026-10-11). PDT reading the same file is a separate task with no prompt yet.
+3b. Zoltan hands `docs/ITV-COURSE-IMPORT-PROMPT.md` to the IdeaToVideo folder when he wants. M2, M4 and M5 are dropped for good (see DECISIONS 2026-10-11). The PDT prompt is `docs/PDT-COURSE-IMPORT-PROMPT.md`, also his to hand out.
 4. Open: Claude, ChatGPT and Grok in the own-key mode are listed as "coming soon".
 5. Zoltan deletes the test data himself (asked 2026-10-11, the assistant does not delete data in his accounts): GHL vidrev 3 courses, Whop FreedompreneurAI 3 hidden courses, MCG 1 course, YouTube 1 unlisted playlist. Exact names and links were given in chat.
 

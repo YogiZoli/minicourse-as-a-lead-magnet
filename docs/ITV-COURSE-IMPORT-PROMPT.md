@@ -98,4 +98,4 @@ OPEN QUESTIONS FOR ME (answer each in your plan with a recommendation)
 
 ## 3. Megjegyzés a PDT-hez
 
-A PDT olvassa be ugyanezt a Course Content Structure fájlt, hogy a Publishing Pack minden leckénél a `title`, a `keyword` és a `youtube.description` mezőből induljon. Ez külön feladat a PDT repóban, ehhez még nincs prompt. A formátum leírása ugyanaz: `schema/course-content-structure.md`.
+A PDT olvassa be ugyanezt a Course Content Structure fájlt, hogy a Publishing Pack minden leckénél a `title`, a `keyword` és a `youtube.description` mezőből induljon. Ez külön feladat a PDT repóban, a prompt hozzá: `docs/PDT-COURSE-IMPORT-PROMPT.md`. A formátum leírása ugyanaz: `schema/course-content-structure.md`.
