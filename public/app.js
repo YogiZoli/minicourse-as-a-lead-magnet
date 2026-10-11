@@ -9,7 +9,7 @@
   var SCREENS = ["sIntro","sQuiz","sGate","sGen","sResult"];
 
   /* Answers and the outline live in this browser tab only, so a reload does not lose the work. */
-  var S = { i:0, answers:{}, lead:null, outline:null, screen:"sIntro" };
+  var S = { i:0, answers:{}, lead:null, outline:null, playlist:null, screen:"sIntro" };
   function save(){ try{ sessionStorage.setItem("mc_state", JSON.stringify(S)); }catch(e){} }
   function load(){
     try{
@@ -283,9 +283,9 @@
   $("genBack").addEventListener("click", function(){ S.i = 0; renderQuestion(); show("sQuiz", "qTitle"); });
   $("copyPrompt").addEventListener("click", function(){ copyText($("promptOut").value, this); logEvent("prompt copied (" + $("promptOut").value.length + " characters)"); });
 
-  function showOutline(o){
+  function showOutline(o, playlist){
     var k = Outline.counts(o);
-    S.outline = o; save();
+    S.outline = o; S.playlist = playlist || null; save();
     renderResult();
     show("sResult", "rTitle");
     logEvent("outline ready: " + k.modules + " modules, " + k.lessons + " lessons");
@@ -444,6 +444,7 @@
     $("programLink").href = PROGRAM_URL;
     $("snapshotPanel").hidden = true;
     $("pdfMsg").textContent = "";
+    structureNote();
     Array.prototype.forEach.call(document.querySelectorAll(".push"), function(host){ setupPush(host); });
     if(ENV.GOOGLE_CLIENT_ID) loadGoogle();
   }
@@ -486,6 +487,36 @@
   $("dlJson").addEventListener("click", function(){ download(fileBase() + "-outline.json", JSON.stringify(S.outline, null, 2), "application/json"); });
   $("dlBriefJson").addEventListener("click", function(){ download(fileBase() + "-video-course-content-brief.json", JSON.stringify(Outline.videoBrief(S.outline), null, 2), "application/json"); });
   $("dlBriefMd").addEventListener("click", function(){ download(fileBase() + "-video-course-content-brief.md", Outline.videoBriefMd(S.outline), "text/markdown;charset=utf-8"); });
+  /* ---------- Course Content Structure: hand the course to IdeaToVideo, and open it again later ---------- */
+  function structureText(){ return JSON.stringify(Outline.contentStructure(S.outline, S.playlist), null, 2); }
+  function structureNote(){
+    $("structureNote").textContent = S.playlist && S.playlist.id
+      ? "Your YouTube playlist is included, so the videos know where they belong."
+      : "Tip: create the YouTube playlist below first. Then the file also carries the playlist.";
+  }
+  $("copyStructure").addEventListener("click", function(){
+    var t = structureText();
+    copyText(t, this);
+    logEvent("course content structure copied (" + t.length + " characters, playlist " + !!(S.playlist && S.playlist.id) + ")");
+  });
+  $("dlStructure").addEventListener("click", function(){ download(fileBase() + "-course-content-structure.json", structureText(), "application/json"); });
+  $("openStructure").addEventListener("click", function(){ setErr($("openErr"), ""); $("openFile").value = ""; $("openFile").click(); });
+  $("openFile").addEventListener("change", function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    if(f.size > 3000000){ setErr($("openErr"), "That file is too large to be a Course Content Structure."); logEvent("open structure: file too large"); return; }
+    var reader = new FileReader();
+    reader.onerror = function(){ setErr($("openErr"), "The file could not be read. Try again."); logEvent("open structure: file could not be read"); };
+    reader.onload = function(){
+      try{
+        var got = Outline.fromContentStructure(String(reader.result));
+        logEvent("course content structure opened from a file");
+        showOutline(got.outline, got.playlist);
+      }catch(e){ setErr($("openErr"), e.message); logEvent("open structure not accepted: " + e.message); }
+    };
+    reader.readAsText(f);
+  });
+
   $("dlYtCsv").addEventListener("click", function(){ download(fileBase() + "-youtube-playlist.csv", Outline.youtubeCsv(S.outline), "text/csv;charset=utf-8"); });
   $("dlSkoolCsv").addEventListener("click", function(){ download(fileBase() + "-skool.csv", Outline.skoolCsv(S.outline), "text/csv;charset=utf-8"); });
   /* Clearing the outline cannot be undone, so it takes a second click. */
@@ -497,7 +528,7 @@
       return;
     }
     b.dataset.armed = ""; b.textContent = "Start a new outline";
-    S.i = 0; S.answers = {}; S.outline = null; save();
+    S.i = 0; S.answers = {}; S.outline = null; S.playlist = null; save();
     $("pasteIn").value = "";
     logEvent("started over");
     show("sIntro");
@@ -669,7 +700,11 @@
           return api("/api/youtube/playlist", { accessToken:token, title:$("ytTitle").value.trim(), description:$("ytDesc").value, privacy:$("ytPrivacy").value }, 45000);
         });
       },
-      done:function(){ return "Done. Your empty playlist is ready on your channel. Nothing is running any more, you can close this page."; }
+      done:function(r){
+        /* The playlist goes into the Course Content Structure, so the next tool knows where the videos belong. */
+        S.playlist = { id:r.playlistId, url:r.link }; save(); structureNote();
+        return "Done. Your empty playlist is ready on your channel. Nothing is running any more, you can close this page.";
+      }
     }
   };
 

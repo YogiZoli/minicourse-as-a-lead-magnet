@@ -22,6 +22,7 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | Own AI key mode | Gemini only, verified with `scripts/test-ai.mjs`. Claude, ChatGPT and Grok are listed but disabled ("coming soon"). The Claude and ChatGPT calls exist in `callAi()` but are untested, Grok is not written |
 | PDF, .md, outline .json | works. PDF layout not yet reviewed by eye |
 | Video Course Content Brief (.json, .md, per lesson .md) | works |
+| Course Content Structure (frozen format 1.1, "Copy for IdeaToVideo", download, reopen from a file) | live. Round trip tested in the browser. The IdeaToVideo and PDT side are not built |
 | YouTube playlist plan (copy blocks, CSV) | works |
 | GHL push | works end to end, tested on the vidrev location: 2 modules, 4 lessons, all Draft. Lesson body text not yet checked by eye |
 | Connect Whop and Connect GoHighLevel (OAuth, no keys to copy) | both work end to end, run live by Zoltan on 2026-10-11. GHL: sign-in, sub-account pick, course created in vidrev. Whop: sign-in, company and Courses apps found, course with 6 chapters and 6 lessons created hidden. The GHL Marketplace app is Public but still Draft, so outside agencies cannot install it until GHL reviews it |
@@ -38,6 +39,7 @@ All five targets work. v2 is functionally complete.
 1. Zoltan: fill `WEBHOOK_URL`, `PROGRAM_URL`, `SNAPSHOT_URL` in `public/config.js` (still empty or placeholder).
 2. Zoltan: review the brand design and the PDF by eye, and one lesson body in GHL, Whop and MCG.
 3. Zoltan has more UI requests (one known: feedback after an action is too small). He wants them as a separate round.
+3b. Zoltan hands `docs/ITV-COURSE-IMPORT-PROMPT.md` to the IdeaToVideo folder when he wants. M2, M4 and M5 are dropped for good (see DECISIONS 2026-10-11). PDT reading the same file is a separate task with no prompt yet.
 4. Open: Claude, ChatGPT and Grok in the own-key mode are listed as "coming soon".
 5. Zoltan deletes the test data himself (asked 2026-10-11, the assistant does not delete data in his accounts): GHL vidrev 3 courses, Whop FreedompreneurAI 3 hidden courses, MCG 1 course, YouTube 1 unlisted playlist. Exact names and links were given in chat.
 

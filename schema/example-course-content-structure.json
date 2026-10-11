@@ -1,0 +1,314 @@
+{
+  "schema_version": "1.1",
+  "type": "course-content-structure",
+  "generated_at": "2026-10-11T00:00:00.000Z",
+  "source": "minicourse-as-a-lead-magnet",
+  "course": {
+    "title": "TEST Sourdough in a Weekend",
+    "slug": "test-sourdough-in-a-weekend",
+    "bold_promise": "Bake your first real sourdough loaf in one weekend, even if you have never made bread.",
+    "ideal_client": "Home cooks who tried sourdough once, got a flat loaf, and gave up.",
+    "lesson_count": 4
+  },
+  "playlist": {
+    "id": "PLxxxxxxxxxxxxxxxx",
+    "url": "https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxx"
+  },
+  "lessons": [
+    {
+      "id": "m1-l1",
+      "playlist_position": 1,
+      "module_position": 1,
+      "module_title": "Wake up your starter",
+      "lesson_position": 1,
+      "title": "What a ready starter looks like",
+      "keyword": "sourdough starter ready",
+      "hook": "Your loaf was flat for one reason, and it happened the day before you baked.",
+      "teach": {
+        "minutes": 4,
+        "points": [
+          "The float test and why it works",
+          "The three signs: bubbles, dome, smell"
+        ]
+      },
+      "do": {
+        "minutes": 4,
+        "exercise": "Feed your starter and mark the jar with a rubber band."
+      },
+      "review": {
+        "minutes": 2,
+        "check": "Did it double within 6 hours? If not, feed it again."
+      },
+      "cta": "Watch the next lesson to mix your dough.",
+      "youtube": {
+        "title": "Is Your Sourdough Starter Ready? 3 Signs",
+        "description": "Three signs your starter is ready to bake with, and a simple test.\n\nLesson 1 of Sourdough in a Weekend."
+      }
+    },
+    {
+      "id": "m1-l2",
+      "playlist_position": 2,
+      "module_position": 1,
+      "module_title": "Wake up your starter",
+      "lesson_position": 2,
+      "title": "Mix the dough: touch one",
+      "keyword": "how to mix sourdough dough",
+      "hook": "You are about to do a third of all the work in four minutes.",
+      "teach": {
+        "minutes": 3,
+        "points": [
+          "The four ingredients and their ratio",
+          "Why you do not knead"
+        ]
+      },
+      "do": {
+        "minutes": 5,
+        "exercise": "Weigh, mix until no dry flour is left, cover."
+      },
+      "review": {
+        "minutes": 2,
+        "check": "Is the dough shaggy and sticky? Good. Leave it."
+      },
+      "cta": "Next: the fold that builds the structure.",
+      "youtube": {
+        "title": "How to Mix Sourdough Dough Without Kneading",
+        "description": "Four ingredients, one bowl, no kneading.\n\nLesson 2 of Sourdough in a Weekend."
+      }
+    },
+    {
+      "id": "m2-l1",
+      "playlist_position": 3,
+      "module_position": 2,
+      "module_title": "Shape and bake",
+      "lesson_position": 1,
+      "title": "Fold and shape: touch two",
+      "keyword": "how to shape sourdough",
+      "hook": "This one fold is the difference between a pancake and a loaf.",
+      "teach": {
+        "minutes": 4,
+        "points": [
+          "The envelope fold",
+          "Surface tension in plain words"
+        ]
+      },
+      "do": {
+        "minutes": 4,
+        "exercise": "Fold, shape, and place the dough in a floured bowl."
+      },
+      "review": {
+        "minutes": 2,
+        "check": "Does the dough hold a round shape for 10 seconds?"
+      },
+      "cta": "Next: bake day.",
+      "youtube": {
+        "title": "How to Shape Sourdough: One Easy Fold",
+        "description": "The envelope fold, step by step.\n\nLesson 3 of Sourdough in a Weekend."
+      }
+    },
+    {
+      "id": "m2-l2",
+      "playlist_position": 4,
+      "module_position": 2,
+      "module_title": "Shape and bake",
+      "lesson_position": 2,
+      "title": "Score and bake: touch three",
+      "keyword": "how to bake sourdough in a dutch oven",
+      "hook": "Twenty minutes with the lid on does something no home oven can do alone.",
+      "teach": {
+        "minutes": 4,
+        "points": [
+          "Why steam matters",
+          "One straight score is enough"
+        ]
+      },
+      "do": {
+        "minutes": 4,
+        "exercise": "Score, bake lid on, then lid off."
+      },
+      "review": {
+        "minutes": 2,
+        "check": "Tap the bottom. A hollow sound means done."
+      },
+      "cta": "Join the Bread Club to bake a new loaf every week.",
+      "youtube": {
+        "title": "Bake Sourdough in a Dutch Oven: Full Bake Day",
+        "description": "Score, steam, bake.\n\nLesson 4 of Sourdough in a Weekend."
+      }
+    }
+  ],
+  "outline": {
+    "schema_version": "1.0",
+    "course": {
+      "title": "TEST Sourdough in a Weekend",
+      "format": "Self-paced video minicourse",
+      "bold_promise": "Bake your first real sourdough loaf in one weekend, even if you have never made bread.",
+      "ideal_client": "Home cooks who tried sourdough once, got a flat loaf, and gave up.",
+      "delivered_by": "The creator, on video",
+      "unique_approach": {
+        "name": "The 3 Touch Method",
+        "summary": "You only handle the dough three times. Everything else is waiting.",
+        "visual": "A timeline with three hand icons on it and long quiet gaps between them.",
+        "rationale": "Beginners overwork dough. Fewer touches means fewer ways to get it wrong."
+      },
+      "sessions": {
+        "count": 4,
+        "duration_minutes": 10
+      },
+      "cta": "Join the 4-week Bread Club to bake a new loaf with a group every week."
+    },
+    "modules": [
+      {
+        "position": 1,
+        "title": "Wake up your starter",
+        "outcome": "You have a lively starter that is ready to bake with.",
+        "lessons": [
+          {
+            "position": 1,
+            "playlist_position": 1,
+            "title": "What a ready starter looks like",
+            "relevance": "Most flat loaves come from a starter that was not ready.",
+            "keyword": "sourdough starter ready",
+            "hook": "Your loaf was flat for one reason, and it happened the day before you baked.",
+            "teach": {
+              "minutes": 4,
+              "points": [
+                "The float test and why it works",
+                "The three signs: bubbles, dome, smell"
+              ]
+            },
+            "do": {
+              "minutes": 4,
+              "exercise": "Feed your starter and mark the jar with a rubber band."
+            },
+            "review": {
+              "minutes": 2,
+              "check": "Did it double within 6 hours? If not, feed it again."
+            },
+            "rationale": "One clear test removes the biggest beginner doubt.",
+            "resources": [
+              {
+                "title": "Starter feeding chart",
+                "type": "handout",
+                "description": "One page, ratios by jar size."
+              }
+            ],
+            "cta": "Watch the next lesson to mix your dough.",
+            "youtube": {
+              "title": "Is Your Sourdough Starter Ready? 3 Signs",
+              "description": "Three signs your starter is ready to bake with, and a simple test.\n\nLesson 1 of Sourdough in a Weekend."
+            }
+          },
+          {
+            "position": 2,
+            "playlist_position": 2,
+            "title": "Mix the dough: touch one",
+            "relevance": "This is the first of only three times you handle the dough.",
+            "keyword": "how to mix sourdough dough",
+            "hook": "You are about to do a third of all the work in four minutes.",
+            "teach": {
+              "minutes": 3,
+              "points": [
+                "The four ingredients and their ratio",
+                "Why you do not knead"
+              ]
+            },
+            "do": {
+              "minutes": 5,
+              "exercise": "Weigh, mix until no dry flour is left, cover."
+            },
+            "review": {
+              "minutes": 2,
+              "check": "Is the dough shaggy and sticky? Good. Leave it."
+            },
+            "rationale": "Doing it right away keeps momentum from the first lesson.",
+            "resources": [
+              {
+                "title": "Ingredient card",
+                "type": "checklist",
+                "description": "Weights for one loaf."
+              }
+            ],
+            "cta": "Next: the fold that builds the structure.",
+            "youtube": {
+              "title": "How to Mix Sourdough Dough Without Kneading",
+              "description": "Four ingredients, one bowl, no kneading.\n\nLesson 2 of Sourdough in a Weekend."
+            }
+          }
+        ]
+      },
+      {
+        "position": 2,
+        "title": "Shape and bake",
+        "outcome": "A baked loaf with an open crumb on your counter.",
+        "lessons": [
+          {
+            "position": 1,
+            "playlist_position": 3,
+            "title": "Fold and shape: touch two",
+            "relevance": "Shape is what turns a puddle into a loaf.",
+            "keyword": "how to shape sourdough",
+            "hook": "This one fold is the difference between a pancake and a loaf.",
+            "teach": {
+              "minutes": 4,
+              "points": [
+                "The envelope fold",
+                "Surface tension in plain words"
+              ]
+            },
+            "do": {
+              "minutes": 4,
+              "exercise": "Fold, shape, and place the dough in a floured bowl."
+            },
+            "review": {
+              "minutes": 2,
+              "check": "Does the dough hold a round shape for 10 seconds?"
+            },
+            "rationale": "One fold is easy to remember and easy to check.",
+            "resources": [],
+            "cta": "Next: bake day.",
+            "youtube": {
+              "title": "How to Shape Sourdough: One Easy Fold",
+              "description": "The envelope fold, step by step.\n\nLesson 3 of Sourdough in a Weekend."
+            }
+          },
+          {
+            "position": 2,
+            "playlist_position": 4,
+            "title": "Score and bake: touch three",
+            "relevance": "The last touch, and the one you will show your friends.",
+            "keyword": "how to bake sourdough in a dutch oven",
+            "hook": "Twenty minutes with the lid on does something no home oven can do alone.",
+            "teach": {
+              "minutes": 4,
+              "points": [
+                "Why steam matters",
+                "One straight score is enough"
+              ]
+            },
+            "do": {
+              "minutes": 4,
+              "exercise": "Score, bake lid on, then lid off."
+            },
+            "review": {
+              "minutes": 2,
+              "check": "Tap the bottom. A hollow sound means done."
+            },
+            "rationale": "Ends on a visible win the student can share.",
+            "resources": [
+              {
+                "title": "Bake day timeline",
+                "type": "handout",
+                "description": "Times from oven on to first slice."
+              }
+            ],
+            "cta": "Join the Bread Club to bake a new loaf every week.",
+            "youtube": {
+              "title": "Bake Sourdough in a Dutch Oven: Full Bake Day",
+              "description": "Score, steam, bake.\n\nLesson 4 of Sourdough in a Weekend."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

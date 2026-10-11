@@ -40,6 +40,15 @@
       <button class="btn" type="button" id="startBtn">Start with question 1</button>
     </div>
     <p class="hint" style="text-align:center">Takes about 10 minutes. Nothing you type is stored on our server.</p>
+    <div class="card">
+      <h3>Already made a course here?</h3>
+      <p class="hint">Open the Course Content Structure file you downloaded, and carry on where you left off.</p>
+      <p class="formerr" id="openErr" role="alert" hidden></p>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="openStructure">Open a Course Content Structure</button>
+        <input type="file" id="openFile" accept=".json,application/json" hidden>
+      </div>
+    </div>
   </section>
 
   <!-- QUESTIONS -->
@@ -192,6 +201,18 @@
           <button class="btn ghost" type="button" id="dlBriefMd">Whole course .md</button>
         </div>
         <div id="rBriefs" class="screen"></div>
+      </div>
+    </details>
+
+    <details id="pStructure">
+      <summary>Course Content Structure <span class="tag">For IdeaToVideo</span><span class="chev">+</span></summary>
+      <div class="body">
+        <p class="hint">Your whole course in one file: every lesson with its title, keyword, hook, Teach, Do, Review, CTA and YouTube text. IdeaToVideo turns it into one ready video project per lesson. Keep the file: it also opens this course again on this page.</p>
+        <div class="actions">
+          <button class="btn" type="button" id="copyStructure">Copy for IdeaToVideo</button>
+          <button class="btn ghost" type="button" id="dlStructure">Download the file</button>
+        </div>
+        <p class="hint" id="structureNote"></p>
       </div>
     </details>
 

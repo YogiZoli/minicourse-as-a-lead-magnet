@@ -197,6 +197,35 @@
     };
   }
 
+  /* ---------- Course Content Structure (see /schema/course-content-structure.md) ----------
+   * One file for the whole course: the flat lesson list other tools read, plus the full outline,
+   * so this page can open the same course again later. The server keeps nothing, the file is the memory.
+   */
+  function contentStructure(o, playlist) {
+    var b = videoBrief(o);
+    return {
+      schema_version: "1.1",
+      type: "course-content-structure",
+      generated_at: b.generated_at,
+      source: b.source,
+      course: b.course,
+      playlist: playlist && playlist.id ? { id: String(playlist.id), url: String(playlist.url || "") } : null,
+      lessons: b.lessons,
+      outline: o
+    };
+  }
+
+  /* Reads a Course Content Structure back. Throws in plain words if it is something else. */
+  function fromContentStructure(input) {
+    var j = input;
+    if (typeof j === "string") j = extractJson(j);
+    if (!j || typeof j !== "object" || j.type !== "course-content-structure") throw new Error("This is not a Course Content Structure. Use the file you downloaded from this page.");
+    if (String(j.schema_version || "").split(".")[0] !== "1") throw new Error("This Course Content Structure was made by a newer version of this page (" + j.schema_version + "). Reload the page and try again.");
+    if (!j.outline) throw new Error("This Course Content Structure has no outline in it, so it cannot be opened here.");
+    var p = j.playlist && typeof j.playlist === "object" && j.playlist.id ? { id: s(j.playlist.id), url: s(j.playlist.url) } : null;
+    return { outline: normalize(j.outline), playlist: p };
+  }
+
   function videoBriefLessonMd(o, x) {
     var l = x.lesson, m = x.module, a = [];
     a.push("# " + l.title, "");
@@ -347,7 +376,7 @@
   }
 
   return {
-    mcgSpec: mcgSpec,
+    mcgSpec: mcgSpec, contentStructure: contentStructure, fromContentStructure: fromContentStructure,
     SCHEMA_VERSION: SCHEMA_VERSION,
     extractJson: extractJson, normalize: normalize, lessons: lessons, counts: counts, lessonMinutes: lessonMinutes,
     lessonContentMd: lessonContentMd, blueprintMd: blueprintMd,

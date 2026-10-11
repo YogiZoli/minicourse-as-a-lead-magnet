@@ -52,7 +52,10 @@ Zoltan Gero "Shine" design system. `public/tokens.css` is a verbatim copy of `Yo
 | `public/app.js` | Page flow and the push buttons |
 | `server.js` | Static files and the proxy routes under `/api/` |
 | `schema/outline.schema.json` | The outline format both generation modes produce |
-| `schema/video-course-content-brief.md` | The video brief format for IdeaToVideo |
+| `schema/course-content-structure.md` | The Course Content Structure: the one file IdeaToVideo and PDT read, and this page reopens. Frozen at 1.1 |
+| `schema/example-course-content-structure.json` | An example, written by the real code |
+| `schema/video-course-content-brief.md` | The older, smaller brief (1.0), still offered as a download |
+| `docs/ITV-COURSE-IMPORT-PROMPT.md` | Description and prompt for the IdeaToVideo import |
 | `schema/example-outline.json` | A small test outline |
 
 ## Logging: how to find out what happened
