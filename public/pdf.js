@@ -49,9 +49,9 @@ function buildBlueprintPdf(outline, name, programUrl, fonts) {
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   var C = {
-    ink:tok("--ink", "0E1330"), label:tok("--label", "4A5068"), muted:tok("--muted-text", "666C84"), border:tok("--border-c", "E6E8F0"),
-    alt:tok("--surface-alt-c", "F0F1F6"), primary:tok("--primary-600", "D91E50"), tint:tok("--primary-50", "FFE9EF"),
-    tintText:tok("--primary-800", "A3143A"), live:tok("--live-500", "00B1B0"), white:[255, 255, 255]
+    ink:tok("--ink", "0F172A"), label:tok("--label", "475569"), muted:tok("--muted-text", "475569"), border:tok("--border-c", "E2E8F0"),
+    alt:tok("--surface-alt-c", "EEF2F6"), primary:tok("--primary-600", "0E7490"), tint:tok("--primary-50", "E6F4F7"),
+    tintText:tok("--primary-800", "0B5F76"), live:tok("--live-500", "0E7490"), white:[255, 255, 255]
   };
   function color(x) { doc.setTextColor(x[0], x[1], x[2]); }
   function fill(x) { doc.setFillColor(x[0], x[1], x[2]); }
