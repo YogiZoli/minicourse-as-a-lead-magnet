@@ -12,61 +12,61 @@
    3. Style everything through var(--...). Never hard-code a hex in a component.
 
    SHINE (2026-09-26), replaces the green/azure canon (archived in tokens.v1.css):
-   - Primary action = fuchsia #D91E50, white text (~5:1), pulsing halo + sheen.
-   - Secondary filled button = ink #0E1330, white text.
-   - Live accent = blue-green #00B1B0: dots, progress, hairlines. Never text.
-     Links use #00807F.
-   - Coral #FF8370 and Freesia #FEC84D: faint background glow only.
-   - Danger is warm orange-red so it never reads as the fuchsia CTA.
+   - Primary action = teal #0E7490, white text (~5:1), pulsing halo + sheen.
+   - Secondary filled button = ink #0F172A, white text.
+   - Live accent = blue-green #0E7490: dots, progress, hairlines. Never text.
+     Links use #0E7490.
+   - Coral #1E3A8A and Freesia #047857: faint background glow only.
+   - Danger is warm orange-red so it never reads as the teal CTA.
    - Light theme only. Open Sans, base 18px.
 
    Compatibility: every previous token name still exists. The old scale names
    are aliases onto the Shine palette:
      --brand-*   (was azure)      -> live blue-green scale, 900/950 -> ink
-     --accent-*  (was green)      -> primary fuchsia scale
+     --accent-*  (was green)      -> primary teal scale
      --neutral-* (was blue-grey)  -> Shine cool neutrals
    Reference design: shine/VidRev App v3.dc.html
    ========================================================================== */
 
 :root {
-  /* --- Primary scale: fuchsia (the action color: CTA fill, money figures) --- */
-  --primary-50:  #FFE9EF;
-  --primary-100: #FFD0DD;
-  --primary-200: #F9A3B8;
-  --primary-300: #F2708F;
-  --primary-400: #EB4A74;
-  --primary-500: #E42256;   /* brand fuchsia, accents only (4.5:1 borderline) */
-  --primary-600: #D91E50;   /* CTA fill, white text ~5:1 */
-  --primary-700: #B3163F;   /* CTA hover, money text */
-  --primary-800: #A3143A;   /* text on primary-50 */
-  --primary-900: #7F0F2D;
+  /* --- Primary scale: teal (the action color: CTA fill, money figures) --- */
+  --primary-50:  #E6F4F7;
+  --primary-100: #CCE9EF;
+  --primary-200: #99D3DF;
+  --primary-300: #5FB8CB;
+  --primary-400: #2A9AB2;
+  --primary-500: #0E7490;   /* brand teal, accents only (4.5:1 borderline) */
+  --primary-600: #0E7490;   /* CTA fill, white text ~5:1 */
+  --primary-700: #0B5F76;   /* CTA hover, money text */
+  --primary-800: #0B5F76;   /* text on primary-50 */
+  --primary-900: #073C4B;
 
   /* --- Live scale: blue-green (motion only: dots, progress, hairlines).
          Never text, except the link shades 700 and 800. --- */
-  --live-50:  #E3F7F6;
-  --live-100: #C4EEEC;
-  --live-200: #92DEDC;
-  --live-300: #55CAC8;
-  --live-400: #1FBDBC;
-  --live-500: #00B1B0;
-  --live-600: #009897;
-  --live-700: #00807F;      /* link colour, 4.6:1 on white */
-  --live-800: #006564;      /* link hover */
-  --live-900: #0B4D4C;
+  --live-50:  #E6F4F7;
+  --live-100: #CCE9EF;
+  --live-200: #99D3DF;
+  --live-300: #5FB8CB;
+  --live-400: #2A9AB2;
+  --live-500: #0E7490;
+  --live-600: #0E7490;
+  --live-700: #0E7490;      /* link colour, 4.6:1 on white */
+  --live-800: #0B5F76;      /* link hover */
+  --live-900: #073C4B;
 
   /* --- Glow colours: background light only, never text or fills --- */
-  --coral:   #FF8370;
-  --freesia: #FEC84D;
+  --coral:   #1E3A8A;
+  --freesia: #047857;
 
   /* --- Neutrals: cool, crisp (90% of every surface) --- */
-  --ink:        #0E1330;   /* body text */
-  --ink-2:      #2A3048;
-  --label:      #4A5068;
-  --muted-text: #666C84;
-  --border-strong-c: #D5D8E3;
-  --border-c:   #E6E8F0;
-  --surface-alt-c: #F0F1F6;
-  --ground:     #F7F8FB;
+  --ink:        #0F172A;   /* body text */
+  --ink-2:      #1E293B;
+  --label:      #475569;
+  --muted-text: #475569;
+  --border-strong-c: #CBD5E1;
+  --border-c:   #E2E8F0;
+  --surface-alt-c: #EEF2F6;
+  --ground:     #F5F7FA;
   --white:      #FFFFFF;
 
   /* --- Compatibility aliases (names other repos already import) --- */
@@ -83,7 +83,7 @@
   --brand-900: var(--ink-2);
   --brand-950: var(--ink);        /* near-black: footer, CTA text, shadow tint */
 
-  /* accent-* was green (the CTA); now the fuchsia primary scale */
+  /* accent-* was green (the CTA); now the teal primary scale */
   --accent-50:  var(--primary-50);
   --accent-100: var(--primary-100);
   --accent-200: var(--primary-200);
@@ -108,11 +108,11 @@
   --neutral-900: #080B1E;
 
   /* --- Semantic (separate from the primary hue) --- */
-  --success:    #0B7A3E;  --success-surface: #E3F3E8;
-  --warning-text: #6B4E00; --warning-dot: #E5A400; --warning-surface: #FBF2DD;
+  --success:    #047857;  --success-surface: #E7F6F0;
+  --warning-text: #92400E; --warning-dot: #B45309; --warning-surface: #FEF3E2;
   --warning:    var(--warning-dot);
-  --danger-text: #A33A00; --danger-dot: #F2651B; --danger-surface: #FFF1E8;
-  --danger-border: rgba(242, 101, 27, 0.4);
+  --danger-text: #92400E; --danger-dot: #B45309; --danger-surface: #FEF3E2;
+  --danger-border: rgba(180, 83, 9, 0.4);
   --danger:     var(--danger-dot);   /* warm orange-red, never reads as the CTA */
   --info:       var(--live-700);
 
@@ -125,14 +125,14 @@
   --muted:               var(--surface-alt-c);
   --muted-foreground:    var(--muted-text);
 
-  --primary:             var(--primary-600);  /* fuchsia CTA (#D91E50), white text ~5:1 */
+  --primary:             var(--primary-600);  /* teal CTA (#0E7490), white text ~5:1 */
   --primary-hover:       var(--primary-700);
   --primary-foreground:  #FFFFFF;
   --primary-surface:     var(--primary-50);
   --primary-surface-foreground: var(--primary-800);
 
   --secondary:           var(--ink);          /* second filled action: ink, white text */
-  --secondary-hover:     #1E2446;
+  --secondary-hover:     #1E3A8A;
   --secondary-foreground: #FFFFFF;
 
   --link:                var(--live-700);
@@ -145,7 +145,7 @@
   --border:              var(--border-c);
   --border-strong:       var(--border-strong-c);
   --input:               var(--border-strong-c);
-  --ring:                rgba(217, 30, 80, 0.2);  /* 3px glow around a primary-bordered focus */
+  --ring:                rgba(14, 116, 144, 0.2);  /* 3px glow around a primary-bordered focus */
   --ring-solid:          var(--primary-600);      /* 2px outlines, where a translucent ring would vanish */
 
   /* --- Typography --- */
@@ -215,11 +215,11 @@
   --border-width: 1px;
 
   /* --- Shadow (ink-tinted, never pure black) --- */
-  --shadow-xs: 0 1px 2px rgba(14, 19, 48, 0.06);
-  --shadow-sm: 0 1px 3px rgba(14, 19, 48, 0.08), 0 1px 2px rgba(14, 19, 48, 0.04);
-  --shadow-md: 0 4px 12px rgba(14, 19, 48, 0.08);
-  --shadow-lg: 0 12px 28px rgba(14, 19, 48, 0.12);
-  --shadow-cta: 0 6px 20px rgba(255, 131, 112, 0.35);  /* coral glow, CTA only */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.12);
+  --shadow-cta: 0 6px 20px rgba(14, 116, 144, 0.30);  /* coral glow, CTA only */
 
   /* --- Motion --- */
   --duration-fast: 120ms;
@@ -230,12 +230,12 @@
   --ease-inout: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* --- Decorative background (faint, breaks flat white) --- */
-  --dot-grid: radial-gradient(rgba(14, 19, 48, 0.07) 1px, transparent 1px);   /* background-size: var(--dot-grid-size) */
+  --dot-grid: radial-gradient(rgba(15, 23, 42, 0.07) 1px, transparent 1px);   /* background-size: var(--dot-grid-size) */
   --dot-grid-size: 20px;
-  --hero-glow: radial-gradient(520px 260px at 100% 0%, rgba(255, 131, 112, 0.22), transparent 70%),
-               radial-gradient(360px 200px at 0% 100%, rgba(254, 200, 77, 0.22), transparent 70%);
+  --hero-glow: radial-gradient(520px 260px at 100% 0%, rgba(14, 116, 144, 0.14), transparent 70%),
+               radial-gradient(360px 200px at 0% 100%, rgba(4, 120, 87, 0.12), transparent 70%);
   --hairline: linear-gradient(90deg, var(--primary-600), var(--live-500));   /* 2px header top line */
-  --grid-line: rgba(14, 19, 48, 0.07);   /* alias kept for older pages */
+  --grid-line: rgba(15, 23, 42, 0.07);   /* alias kept for older pages */
   --hero-wash: var(--hero-glow);         /* alias kept for older pages */
 }
 
@@ -293,12 +293,12 @@
 .btn-ghost { background: var(--surface); color: var(--foreground); border-color: var(--border-strong); }
 .btn-ghost:hover { background: var(--surface-alt); border-color: var(--neutral-400); }
 
-/* Pulsing CTA  fuchsia halo ring over a coral glow, does not shift layout. */
+/* Pulsing CTA  teal halo ring over a coral glow, does not shift layout. */
 .btn-pulse { position: relative; animation: cta-halo 2.4s var(--ease-out) infinite; }
 @keyframes cta-halo {
-  0%   { box-shadow: 0 0 0 0 rgba(228, 34, 86, 0.5), 0 6px 20px rgba(255, 131, 112, 0.35); }
-  70%  { box-shadow: 0 0 0 14px transparent, 0 6px 20px rgba(255, 131, 112, 0.35); }
-  100% { box-shadow: 0 0 0 0 transparent, 0 6px 20px rgba(255, 131, 112, 0.35); }
+  0%   { box-shadow: 0 0 0 0 rgba(14, 116, 144, 0.5), 0 6px 20px rgba(14, 116, 144, 0.30); }
+  70%  { box-shadow: 0 0 0 14px transparent, 0 6px 20px rgba(14, 116, 144, 0.30); }
+  100% { box-shadow: 0 0 0 0 transparent, 0 6px 20px rgba(14, 116, 144, 0.30); }
 }
 /* Light sheen sweep across the primary CTA. */
 .btn-sheen { position: relative; overflow: hidden; }
@@ -359,7 +359,7 @@ a.link:hover { color: var(--link-hover); text-decoration: underline; text-underl
 hr.rule { border: 0; border-top: var(--border-width) solid var(--border); margin: var(--space-8) 0; }
 
 /* --- Shine motion keyframes (count-up pop, live rows, toasts, skeletons) --- */
-@keyframes num-pop { 0% { transform: scale(1); } 30% { transform: scale(1.09); text-shadow: 0 0 22px rgba(255, 131, 112, 0.35); } 60% { transform: scale(0.98); } 100% { transform: scale(1); text-shadow: none; } }
+@keyframes num-pop { 0% { transform: scale(1); } 30% { transform: scale(1.09); text-shadow: 0 0 22px rgba(14, 116, 144, 0.30); } 60% { transform: scale(0.98); } 100% { transform: scale(1); text-shadow: none; } }
 @keyframes sheen { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(220%); } }
 @keyframes ping { 75%, 100% { transform: scale(2.2); opacity: 0; } }
 @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
