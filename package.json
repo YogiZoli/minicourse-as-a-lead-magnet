@@ -8,6 +8,6 @@
     "start": "node server.js",
     "test:push": "node scripts/test-push.mjs"
   },
-  "engines": { "node": ">=20" },
+  "engines": { "node": "24.x" },
   "license": "UNLICENSED"
 }
