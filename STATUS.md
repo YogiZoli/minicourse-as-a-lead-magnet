@@ -1,6 +1,6 @@
 # STATUS
 
-Updated: 2026-10-11
+Updated: 2026-10-20
 
 ## End goal
 
@@ -32,6 +32,8 @@ A lead magnet that turns a creator's expertise into a complete course outline an
 | YouTube playlist | works end to end, tested live by Zoltan on 2026-10-10 (unlisted playlist created) |
 
 ## Next step
+
+00. Zoltan: deploy main (Node pinned to 24.x, plus the merged colour fix PR 1, neither is live yet; Railway is not linked to GitHub): `railway up` in this folder, then check `/healthz`.
 
 All five targets work. v2 is functionally complete.
 
